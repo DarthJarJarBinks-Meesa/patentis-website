@@ -29,6 +29,9 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body data-page="home">
+  <div class="constellation-layer" aria-hidden="true">
+    <canvas id="constellationCanvas"></canvas>
+  </div>
   <header class="site-header">
     <nav class="nav-shell">
       <a class="wordmark" href="index.html">PATENTIS</a>
@@ -47,7 +50,6 @@
 
   <main>
     <section class="hero">
-      <canvas id="patentGraph" aria-hidden="true"></canvas>
       <div class="hero-content">
         <p class="eyebrow reveal">AI Patent Intelligence</p>
         <h1 class="reveal">Find the patents nobody has filed yet.</h1>

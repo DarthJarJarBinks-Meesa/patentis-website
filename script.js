@@ -1,12 +1,8 @@
 (() => {
-  const page = document.body.dataset.page || "";
-
   initMobileNav();
   initRevealAnimations();
   initCounterAnimations();
-  if (page === "home") {
-    initPatentGraph();
-  }
+  initConstellation();
 
   function initMobileNav() {
     const button = document.querySelector(".menu-toggle");
@@ -90,26 +86,36 @@
     if (statsBar) observer.observe(statsBar);
   }
 
-  function initPatentGraph() {
-    const canvas = document.getElementById("patentGraph");
+  function initConstellation() {
+    const canvas = document.getElementById("constellationCanvas");
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const MAX_NODES = 80;
-    const LINK_DISTANCE = 155;
-    const REPULSION_RADIUS = 145;
-    const REPULSION_STRENGTH = 0.06;
+    const LINK_DISTANCE = 118;
+    const CELL = LINK_DISTANCE;
+    const REPULSION_RADIUS = 130;
+    const REPULSION_STRENGTH = 0.055;
     const mouse = { x: -9999, y: -9999 };
     const nodes = [];
     let width = 0;
     let height = 0;
     let dpr = 1;
 
+    function nodeCountForViewport() {
+      const area = width * height;
+      const density = Math.floor(area / 1150);
+      return Math.min(520, Math.max(260, density));
+    }
+
+    function cellKey(x, y) {
+      return `${Math.floor(x / CELL)},${Math.floor(y / CELL)}`;
+    }
+
     const setCanvasSize = () => {
-      dpr = window.devicePixelRatio || 1;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
       width = window.innerWidth;
-      height = Math.max(window.innerHeight, 620);
+      height = Math.max(window.innerHeight, 480);
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
       canvas.style.width = `${width}px`;
@@ -118,42 +124,66 @@
     };
 
     const initNodes = () => {
+      const n = nodeCountForViewport();
       nodes.length = 0;
-      for (let i = 0; i < MAX_NODES; i += 1) {
+      for (let i = 0; i < n; i += 1) {
         nodes.push({
           x: Math.random() * width,
           y: Math.random() * height,
-          vx: (Math.random() - 0.5) * 0.35,
-          vy: (Math.random() - 0.5) * 0.35,
-          radius: Math.random() * 1.6 + 1.5,
+          vx: (Math.random() - 0.5) * 0.32,
+          vy: (Math.random() - 0.5) * 0.32,
+          radius: Math.random() * 1.35 + 1.15,
           pulse: Math.random() * Math.PI * 2
         });
       }
     };
 
-    const drawFrame = () => {
-      ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = "rgba(5, 10, 18, 0.8)";
-      ctx.fillRect(0, 0, width, height);
+    const drawEdgesSpatial = () => {
+      const buckets = new Map();
+      for (let i = 0; i < nodes.length; i += 1) {
+        const n = nodes[i];
+        const k = cellKey(n.x, n.y);
+        if (!buckets.has(k)) buckets.set(k, []);
+        buckets.get(k).push(i);
+      }
 
+      const offsets = [-1, 0, 1];
       for (let i = 0; i < nodes.length; i += 1) {
         const a = nodes[i];
-        for (let j = i + 1; j < nodes.length; j += 1) {
-          const b = nodes[j];
-          const dx = a.x - b.x;
-          const dy = a.y - b.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist < LINK_DISTANCE) {
-            const alpha = (1 - dist / LINK_DISTANCE) * 0.4;
-            ctx.strokeStyle = `rgba(72, 126, 255, ${alpha})`;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(a.x, a.y);
-            ctx.lineTo(b.x, b.y);
-            ctx.stroke();
+        const cx = Math.floor(a.x / CELL);
+        const cy = Math.floor(a.y / CELL);
+        for (const ox of offsets) {
+          for (const oy of offsets) {
+            const key = `${cx + ox},${cy + oy}`;
+            const bucket = buckets.get(key);
+            if (!bucket) continue;
+            for (const j of bucket) {
+              if (j <= i) continue;
+              const b = nodes[j];
+              const dx = a.x - b.x;
+              const dy = a.y - b.y;
+              const dist = Math.hypot(dx, dy);
+              if (dist < LINK_DISTANCE) {
+                const alpha = (1 - dist / LINK_DISTANCE) * 0.38;
+                ctx.strokeStyle = `rgba(72, 126, 255, ${alpha})`;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(b.x, b.y);
+                ctx.stroke();
+              }
+            }
           }
         }
       }
+    };
+
+    const drawFrame = () => {
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "rgba(5, 10, 18, 0.82)";
+      ctx.fillRect(0, 0, width, height);
+
+      drawEdgesSpatial();
 
       nodes.forEach((node) => {
         const dx = node.x - mouse.x;
@@ -169,34 +199,59 @@
         node.vy *= 0.992;
         node.x += node.vx;
         node.y += node.vy;
-        node.pulse += 0.028;
+        node.pulse += 0.026;
 
         if (node.x <= 0 || node.x >= width) node.vx *= -1;
         if (node.y <= 0 || node.y >= height) node.vy *= -1;
         node.x = Math.max(2, Math.min(width - 2, node.x));
         node.y = Math.max(2, Math.min(height - 2, node.y));
 
-        const pulseSize = node.radius + Math.sin(node.pulse) * 0.7;
+        const pulseSize = node.radius + Math.sin(node.pulse) * 0.65;
         ctx.beginPath();
-        ctx.fillStyle = "rgba(198, 222, 255, 0.92)";
+        ctx.fillStyle = "rgba(198, 222, 255, 0.9)";
         ctx.arc(node.x, node.y, pulseSize, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.beginPath();
-        ctx.fillStyle = "rgba(46, 123, 255, 0.25)";
-        ctx.arc(node.x, node.y, pulseSize * 2.6, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(46, 123, 255, 0.22)";
+        ctx.arc(node.x, node.y, pulseSize * 2.5, 0, Math.PI * 2);
         ctx.fill();
       });
 
       requestAnimationFrame(drawFrame);
     };
 
+    const onPointer = (clientX, clientY) => {
+      mouse.x = clientX;
+      mouse.y = clientY;
+    };
+
     window.addEventListener("mousemove", (event) => {
-      mouse.x = event.clientX;
-      mouse.y = event.clientY;
+      onPointer(event.clientX, event.clientY);
     });
 
     window.addEventListener("mouseleave", () => {
+      mouse.x = -9999;
+      mouse.y = -9999;
+    });
+
+    window.addEventListener(
+      "touchstart",
+      (e) => {
+        if (e.touches.length) onPointer(e.touches[0].clientX, e.touches[0].clientY);
+      },
+      { passive: true }
+    );
+
+    window.addEventListener(
+      "touchmove",
+      (e) => {
+        if (e.touches.length) onPointer(e.touches[0].clientX, e.touches[0].clientY);
+      },
+      { passive: true }
+    );
+
+    window.addEventListener("touchend", () => {
       mouse.x = -9999;
       mouse.y = -9999;
     });
