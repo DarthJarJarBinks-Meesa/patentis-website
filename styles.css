@@ -33,6 +33,7 @@ body {
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
+  transform: translateZ(0);
 }
 
 .constellation-layer canvas {
@@ -42,6 +43,17 @@ body {
 }
 
 main {
+  position: relative;
+  z-index: 1;
+}
+
+/* Stack all primary content above the fixed canvas (inside main) */
+main > section {
+  position: relative;
+  z-index: 1;
+}
+
+main.model-state > *:not(.constellation-layer) {
   position: relative;
   z-index: 1;
 }
@@ -127,6 +139,7 @@ a {
 .hero {
   min-height: 100vh;
   position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;

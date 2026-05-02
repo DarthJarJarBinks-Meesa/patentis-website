@@ -179,8 +179,12 @@
     };
 
     const drawFrame = () => {
+      if (width < 2 || height < 2) {
+        requestAnimationFrame(drawFrame);
+        return;
+      }
       ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = "rgba(5, 10, 18, 0.82)";
+      ctx.fillStyle = "rgba(5, 10, 18, 0.72)";
       ctx.fillRect(0, 0, width, height);
 
       drawEdgesSpatial();
@@ -208,12 +212,12 @@
 
         const pulseSize = node.radius + Math.sin(node.pulse) * 0.65;
         ctx.beginPath();
-        ctx.fillStyle = "rgba(198, 222, 255, 0.9)";
+        ctx.fillStyle = "rgba(220, 235, 255, 0.98)";
         ctx.arc(node.x, node.y, pulseSize, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.beginPath();
-        ctx.fillStyle = "rgba(46, 123, 255, 0.22)";
+        ctx.fillStyle = "rgba(46, 123, 255, 0.28)";
         ctx.arc(node.x, node.y, pulseSize * 2.5, 0, Math.PI * 2);
         ctx.fill();
       });
@@ -261,8 +265,20 @@
       initNodes();
     });
 
-    setCanvasSize();
-    initNodes();
-    requestAnimationFrame(drawFrame);
+    const boot = () => {
+      setCanvasSize();
+      initNodes();
+      requestAnimationFrame(() => {
+        setCanvasSize();
+        initNodes();
+        requestAnimationFrame(drawFrame);
+      });
+    };
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", boot);
+    } else {
+      boot();
+    }
   }
 })();
