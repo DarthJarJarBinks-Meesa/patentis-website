@@ -101,17 +101,14 @@
       <div class="cta-panel reveal">
         <h2>Get early access</h2>
         <p>Join the first wave of builders, R&amp;D teams, and IP strategists using Patentis.</p>
+        <!-- No _next here: FormSubmit can redirect with POST → GitHub Pages returns 405. JS submits via AJAX then redirects with GET. -->
         <form
           class="cta-form"
-          action="https://formsubmit.co/sepehrkhavari13@gmail.com"
+          action="https://formsubmit.co/sepehrkhavari13%40gmail.com"
           method="POST"
+          data-thanks-url="https://darthjarjarbinks-meesa.github.io/patentis-website/?thanks=1"
         >
           <input type="hidden" name="_subject" value="Patentis — early access request">
-          <input
-            type="hidden"
-            name="_next"
-            value="https://darthjarjarbinks-meesa.github.io/patentis-website/?thanks=1"
-          />
           <input
             type="email"
             name="email"

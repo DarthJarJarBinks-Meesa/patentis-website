@@ -3,6 +3,7 @@
   initRevealAnimations();
   initCounterAnimations();
   initConstellation();
+  initEarlyAccessForm();
 
   function initMobileNav() {
     const button = document.querySelector(".menu-toggle");
@@ -280,5 +281,61 @@
     } else {
       boot();
     }
+  }
+
+  function initEarlyAccessForm() {
+    const form = document.querySelector(".cta-form");
+    if (!form) return;
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const thanksRaw = form.getAttribute("data-thanks-url") || "";
+      const btn = form.querySelector('button[type="submit"]');
+      const prevLabel = btn ? btn.textContent : "";
+
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Sending…";
+      }
+
+      const emailEncoded = encodeURIComponent("sepehrkhavari13@gmail.com");
+      const ajaxUrl = `https://formsubmit.co/ajax/${emailEncoded}`;
+
+      const fd = new FormData(form);
+
+      try {
+        const res = await fetch(ajaxUrl, {
+          method: "POST",
+          body: fd,
+          headers: { Accept: "application/json" }
+        });
+
+        let payload = {};
+        try {
+          payload = await res.json();
+        } catch {
+          payload = {};
+        }
+
+        if (!res.ok) {
+          throw new Error(payload.message || payload.error || `HTTP ${res.status}`);
+        }
+        if (payload.success === false || payload.success === "false") {
+          throw new Error(payload.message || "Submission rejected");
+        }
+
+        const dest = thanksRaw.trim();
+        window.location.assign(dest || `${window.location.pathname}?thanks=1`);
+      } catch (err) {
+        console.error(err);
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = prevLabel;
+        }
+        window.alert(
+          "We couldn’t submit that from this page. Please try again or email hello@patentis.ai."
+        );
+      }
+    });
   }
 })();
