@@ -333,7 +333,7 @@
           btn.textContent = prevLabel;
         }
         window.alert(
-          "We couldn’t submit that from this page. Please try again or email hello@patentis.ai."
+          "We couldn’t submit that from this page. Please try again or email sepehrkhavari13@gmail.com."
         );
       }
     });
