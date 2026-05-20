@@ -1,21 +1,19 @@
 import json
-import re
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from services import session_store, llm, rag
 from services.paper_search import search_pubmed
+from services.text_utils import strip_think
 from models.schemas import SelectIdeaRequest
 from api.deps import get_groq_key
 
 router = APIRouter()
 
 
-def _strip_think(text: str) -> str:
-    return re.sub(r"<think>[\s\S]*?</think>", "", text).strip()
-
-
 def _parse_json(text: str) -> any:
-    text = _strip_think(text).strip()
+    text = strip_think(text)
+    if not text:
+        raise json.JSONDecodeError("Empty response after stripping think blocks", "", 0)
     if text.startswith("```"):
         text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
     # Try direct parse first
@@ -32,13 +30,11 @@ def _parse_json(text: str) -> any:
                 return json.loads(text[start : end + 1])
             except json.JSONDecodeError:
                 continue
-    print("=== RAW MODEL OUTPUT (parse failed) ===\n", text[:2000])
     raise json.JSONDecodeError("Could not extract JSON", text, 0)
 
 
 @router.post("/session/{session_id}/generate-ideas")
 async def generate_ideas(session_id: str, groq_key: str = Depends(get_groq_key)):
-    import traceback
     try:
         session = session_store.get_session(session_id)
     except KeyError:
@@ -47,16 +43,24 @@ async def generate_ideas(session_id: str, groq_key: str = Depends(get_groq_key))
     if not session.analysis:
         raise HTTPException(status_code=400, detail="Run analysis first")
 
-    try:
-        return await _generate_ideas_impl(session, groq_key)
-    except HTTPException:
-        raise
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
+    async def event_stream():
+        import traceback
+        try:
+            async for event in _generate_ideas_stream(session, groq_key):
+                yield f"data: {json.dumps(event)}\n\n"
+        except Exception as e:
+            traceback.print_exc()
+            yield f"data: {json.dumps({'error': f'{type(e).__name__}: {e}'})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
-async def _generate_ideas_impl(session, groq_key: str = ""):
+async def _generate_ideas_stream(session, groq_key: str = ""):
+    yield {"status": "Generating candidate ideas…"}
 
     # Stage 1: Generate 7 candidate ideas from patent gap analysis
     candidate_messages = [
@@ -72,7 +76,7 @@ async def _generate_ideas_impl(session, groq_key: str = ""):
             "role": "user",
             "content": (
                 f'Patent landscape analysis for "{session.query}":\n\n'
-                f"{session.analysis}\n\n"
+                f"{session.analysis[:5000]}\n\n"
                 "Generate exactly 7 novel medtech product/technology ideas that:\n"
                 "1. Specifically fill the identified patent gaps\n"
                 "2. Are technically feasible\n"
@@ -97,11 +101,13 @@ async def _generate_ideas_impl(session, groq_key: str = ""):
         },
     ]
 
-    raw = await llm.chat_complete(llm.REASONING_MODEL, candidate_messages, temperature=0.85, groq_api_key=groq_key)
+    raw = await llm.chat_complete(llm.REASONING_MODEL, candidate_messages, temperature=0.85, groq_api_key=groq_key, max_tokens=6000)
     try:
         candidates = _parse_json(raw)
     except (json.JSONDecodeError, ValueError):
-        raise HTTPException(status_code=500, detail="Model returned malformed JSON for candidates")
+        raise ValueError("Model returned malformed JSON for candidates")
+
+    yield {"status": "Searching PubMed literature…"}
 
     # Stage 2: Search PubMed with combined keywords from all candidates
     all_keywords: list[str] = []
@@ -142,8 +148,8 @@ async def _generate_ideas_impl(session, groq_key: str = ""):
             "role": "user",
             "content": (
                 f"Research area: \"{session.query}\"\n\n"
-                f"Candidate ideas:\n{json.dumps(candidates, indent=2)}\n\n"
-                f"Relevant PubMed research:\n{pubmed_context}\n\n"
+                f"Candidate ideas:\n{json.dumps(candidates, indent=2)[:4000]}\n\n"
+                f"Relevant PubMed research:\n{pubmed_context[:2000]}\n\n"
                 "Select the 3 to 5 ideas that are BOTH:\n"
                 "1. Most likely to be patentable (based on the gap analysis)\n"
                 "2. Most scientifically feasible (supported or at least not contradicted by PubMed research)\n\n"
@@ -159,14 +165,16 @@ async def _generate_ideas_impl(session, groq_key: str = ""):
         },
     ]
 
-    raw2 = await llm.chat_complete(llm.REASONING_MODEL, validation_messages, temperature=0.6, groq_api_key=groq_key)
+    yield {"status": "Validating and ranking ideas…"}
+
+    raw2 = await llm.chat_complete(llm.REASONING_MODEL, validation_messages, temperature=0.6, groq_api_key=groq_key, max_tokens=4000)
     try:
         ideas = _parse_json(raw2)
     except (json.JSONDecodeError, ValueError):
-        raise HTTPException(status_code=500, detail="Model returned malformed JSON for validated ideas")
+        raise ValueError("Model returned malformed JSON for validated ideas")
 
     session_store.update_session(session.id, {"ideas": ideas})
-    return {"ideas": ideas}
+    yield {"done": True, "ideas": ideas}
 
 
 @router.post("/session/{session_id}/select-idea")

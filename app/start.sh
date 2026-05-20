@@ -7,29 +7,7 @@ echo "=== Patentis ==="
 # Backend
 cd "$ROOT/backend"
 
-if [ ! -d ".venv" ]; then
-  echo "Creating Python virtual environment…"
-  python3 -m venv .venv
-fi
-
-source .venv/bin/activate
-pip install -q -r requirements.txt
-
-if [ ! -f ".env" ]; then
-  cp .env.example .env
-  echo ""
-  echo "  !! Created backend/.env — add your GROQ_API_KEY before continuing."
-  echo "     Get one free at https://console.groq.com"
-  echo ""
-  exit 0
-fi
-
-# Verify key is set
-source .env
-if [ -z "$GROQ_API_KEY" ] || [ "$GROQ_API_KEY" = "gsk_..." ]; then
-  echo "ERROR: Set GROQ_API_KEY in backend/.env (get one at https://console.groq.com)"
-  exit 1
-fi
+[ -f ".env" ] && source .env
 
 uvicorn main:app --reload --port 8000 &
 BACKEND_PID=$!

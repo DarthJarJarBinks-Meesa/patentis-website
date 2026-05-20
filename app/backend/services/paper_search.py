@@ -24,8 +24,7 @@ async def search_pubmed(keywords: list[str], limit: int = 12) -> list[Paper]:
             )
             search_resp.raise_for_status()
             pmids = search_resp.json().get("esearchresult", {}).get("idlist", [])
-    except Exception as e:
-        print(f"PubMed search error: {e}")
+    except Exception:
         return []
 
     if not pmids:
@@ -44,8 +43,7 @@ async def search_pubmed(keywords: list[str], limit: int = 12) -> list[Paper]:
             )
             fetch_resp.raise_for_status()
             xml = fetch_resp.text
-    except Exception as e:
-        print(f"PubMed fetch error: {e}")
+    except Exception:
         return []
 
     return _parse_pubmed_xml(xml)

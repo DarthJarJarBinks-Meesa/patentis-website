@@ -2,6 +2,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from services import session_store, rag, llm
+from services.text_utils import strip_think
 from models.schemas import Patent, Paper
 from api.deps import get_groq_key
 
@@ -55,8 +56,7 @@ async def analyze(session_id: str, groq_key: str = Depends(get_groq_key)):
         )
 
     rag.embed_documents(session_id, documents)
-    all_docs = rag.get_all_documents(session_id)
-    context = "\n\n---\n\n".join(d["text"] for d in all_docs)
+    context = "\n\n---\n\n".join(d["text"] for d in documents)
 
     messages = [
         {
@@ -91,10 +91,10 @@ async def analyze(session_id: str, groq_key: str = Depends(get_groq_key)):
     async def stream_analysis():
         full_response = ""
         try:
-            async for chunk in llm.chat_stream(llm.REASONING_MODEL, messages, temperature=0.3, groq_api_key=groq_key):
+            async for chunk in llm.chat_stream(llm.REASONING_MODEL, messages, temperature=0.3, groq_api_key=groq_key, max_tokens=4096):
                 full_response += chunk
                 yield f"data: {json.dumps({'content': chunk})}\n\n"
-            session_store.update_session(session_id, {"analysis": full_response})
+            session_store.update_session(session_id, {"analysis": strip_think(full_response)})
             yield f"data: {json.dumps({'done': True})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"

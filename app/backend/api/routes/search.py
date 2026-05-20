@@ -1,5 +1,5 @@
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from models.schemas import SearchRequest, SearchResponse
 from services import session_store, llm
 from services.patent_search import search_google_patents, search_epo

@@ -1,5 +1,4 @@
 import httpx
-from urllib.parse import quote
 from models.schemas import Patent
 
 GOOGLE_PATENTS_XHR = "https://patents.google.com/xhr/query"
@@ -12,7 +11,6 @@ _HEADERS = {
 
 async def search_google_patents(keywords: list[str], limit: int = 15) -> list[Patent]:
     query = "+".join(kw.replace(" ", "+") for kw in keywords[:6])
-    url_param = quote(f"q={query}&num={limit}&language=ENGLISH")
 
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
@@ -23,8 +21,7 @@ async def search_google_patents(keywords: list[str], limit: int = 15) -> list[Pa
             )
             response.raise_for_status()
             data = response.json()
-    except Exception as e:
-        print(f"Google Patents search error: {e}")
+    except Exception:
         return []
 
     patents = []
@@ -127,6 +124,5 @@ async def search_epo(keywords: list[str], limit: int = 8) -> list[Patent]:
                 )
             )
         return patents
-    except Exception as e:
-        print(f"EPO search error: {e}")
+    except Exception:
         return []

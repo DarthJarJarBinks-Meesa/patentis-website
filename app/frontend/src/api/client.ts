@@ -34,19 +34,14 @@ export async function updateSelection(
   return res.json()
 }
 
-export async function generateIdeas(sessionId: string) {
-  const res = await fetch(`${BASE}/session/${sessionId}/generate-ideas`, {
-    method: 'POST',
-    headers: { ...groqHeaders() },
-  })
-  if (!res.ok) throw new Error(await res.text())
-  return res.json()
+export function streamGenerateIdeas(sessionId: string) {
+  return streamSSE(`${BASE}/session/${sessionId}/generate-ideas`, { method: 'POST' })
 }
 
 export async function* streamSSE(
   url: string,
   options?: RequestInit,
-): AsyncGenerator<{ content?: string; done?: boolean; error?: string }> {
+): AsyncGenerator<{ content?: string; done?: boolean; error?: string; status?: string; ideas?: unknown }> {
   const res = await fetch(url, {
     ...options,
     headers: {

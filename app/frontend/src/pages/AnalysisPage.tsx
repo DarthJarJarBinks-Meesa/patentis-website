@@ -2,21 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import ThinkingBlock from '../components/ThinkingBlock'
 import { useStore } from '../store'
-import { streamAnalysis, generateIdeas } from '../api/client'
-
-function parseThinking(text: string): { thinking: string; response: string } {
-  const match = text.match(/<think>([\s\S]*?)<\/think>/i)
-  const thinking = match ? match[1].trim() : ''
-  const response = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
-  return { thinking, response }
-}
+import { streamAnalysis, streamGenerateIdeas } from '../api/client'
+import { parseThinking } from '../utils/thinking'
 
 export default function AnalysisPage() {
-  const { sessionId, analysis, appendAnalysis, setAnalysis, setIdeas, setStep, setError, error } =
+  const { sessionId, analysis, appendAnalysis, setAnalysis, setIdeas, setStep, setError, error, reset } =
     useStore()
 
   const [streaming, setStreaming] = useState(false)
   const [generatingIdeas, setGeneratingIdeas] = useState(false)
+  const [generatingStatus, setGeneratingStatus] = useState('')
   const [done, setDone] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -55,15 +50,37 @@ export default function AnalysisPage() {
   const handleGenerateIdeas = async () => {
     if (!sessionId) return
     setGeneratingIdeas(true)
+    setGeneratingStatus('')
     setError(null)
     try {
-      const data = await generateIdeas(sessionId)
-      setIdeas(data.ideas)
-      setStep(4)
+      for await (const event of streamGenerateIdeas(sessionId)) {
+        if (event.error) {
+          const msg = event.error as string
+          if (msg.includes('Session not found')) {
+            setError('Session expired — server was restarted. Please start a new search.')
+            setTimeout(() => { reset(); setStep(1) }, 2500)
+          } else {
+            setError(msg)
+          }
+          return
+        }
+        if (event.status) setGeneratingStatus(event.status as string)
+        if (event.done) {
+          setIdeas(event.ideas as never[])
+          setStep(4)
+        }
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Idea generation failed')
+      const msg = err instanceof Error ? err.message : 'Idea generation failed'
+      if (msg.includes('Session not found')) {
+        setError('Session expired — server was restarted. Please start a new search.')
+        setTimeout(() => { reset(); setStep(1) }, 2500)
+      } else {
+        setError(msg)
+      }
     } finally {
       setGeneratingIdeas(false)
+      setGeneratingStatus('')
     }
   }
 
@@ -126,7 +143,7 @@ export default function AnalysisPage() {
         </button>
         <button
           onClick={handleGenerateIdeas}
-          disabled={!done || streaming || generatingIdeas}
+          disabled={!analysis || streaming || generatingIdeas}
           className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-xl px-6 py-2.5 text-sm font-semibold transition-colors flex items-center gap-2"
         >
           {generatingIdeas ? (
@@ -135,7 +152,7 @@ export default function AnalysisPage() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Generating ideas…
+              {generatingStatus || 'Starting…'}
             </>
           ) : (
             'Generate Ideas →'

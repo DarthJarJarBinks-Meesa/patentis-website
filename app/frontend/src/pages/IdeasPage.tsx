@@ -3,13 +3,7 @@ import IdeaCard from '../components/IdeaCard'
 import ThinkingBlock from '../components/ThinkingBlock'
 import { useStore } from '../store'
 import { streamSelectIdea } from '../api/client'
-
-function parseThinking(text: string): { thinking: string; response: string } {
-  const match = text.match(/<think>([\s\S]*?)<\/think>/i)
-  const thinking = match ? match[1].trim() : ''
-  const response = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
-  return { thinking, response }
-}
+import { parseThinking } from '../utils/thinking'
 
 export default function IdeasPage() {
   const {

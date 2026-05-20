@@ -1,3 +1,4 @@
+import asyncio
 import httpx
 import json
 import os
@@ -17,38 +18,53 @@ def _headers(groq_api_key: str = "") -> dict:
     return {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
 
 
-async def chat_complete(model: str, messages: list[dict], temperature: float = 0.7, groq_api_key: str = "") -> str:
-    async with httpx.AsyncClient(timeout=180.0) as client:
-        response = await client.post(
-            f"{GROQ_BASE}/chat/completions",
-            headers=_headers(groq_api_key),
-            json={"model": model, "messages": messages, "temperature": temperature, "stream": False},
-        )
-        response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
+async def chat_complete(model: str, messages: list[dict], temperature: float = 0.7, groq_api_key: str = "", max_tokens: int | None = None) -> str:
+    for attempt in range(4):
+        try:
+            full = ""
+            async for chunk in chat_stream(model, messages, temperature, groq_api_key, max_tokens=max_tokens):
+                full += chunk
+            return full
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 429 or attempt >= 3:
+                raise
+            wait = float(exc.response.headers.get("retry-after", 2 ** (attempt + 1)))
+            await asyncio.sleep(min(wait, 60))
+    raise RuntimeError("chat_complete: all retries exhausted")
 
 
 async def chat_stream(
-    model: str, messages: list[dict], temperature: float = 0.7, groq_api_key: str = ""
+    model: str, messages: list[dict], temperature: float = 0.7, groq_api_key: str = "", max_tokens: int | None = None
 ) -> AsyncGenerator[str, None]:
-    async with httpx.AsyncClient(timeout=300.0) as client:
-        async with client.stream(
-            "POST",
-            f"{GROQ_BASE}/chat/completions",
-            headers=_headers(groq_api_key),
-            json={"model": model, "messages": messages, "temperature": temperature, "stream": True},
-        ) as response:
-            response.raise_for_status()
-            async for line in response.aiter_lines():
-                if not line or not line.startswith("data: "):
-                    continue
-                raw = line[6:].strip()
-                if raw == "[DONE]":
-                    break
-                data = json.loads(raw)
-                content = data["choices"][0].get("delta", {}).get("content", "")
-                if content:
-                    yield content
+    payload: dict = {"model": model, "messages": messages, "temperature": temperature, "stream": True}
+    if max_tokens is not None:
+        payload["max_tokens"] = max_tokens
+    for attempt in range(4):
+        try:
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                async with client.stream(
+                    "POST",
+                    f"{GROQ_BASE}/chat/completions",
+                    headers=_headers(groq_api_key),
+                    json=payload,
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line or not line.startswith("data: "):
+                            continue
+                        raw = line[6:].strip()
+                        if raw == "[DONE]":
+                            break
+                        data = json.loads(raw)
+                        content = data["choices"][0].get("delta", {}).get("content", "")
+                        if content:
+                            yield content
+            return
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code != 429 or attempt >= 3:
+                raise
+            wait = float(exc.response.headers.get("retry-after", 2 ** (attempt + 1)))
+            await asyncio.sleep(min(wait, 60))
 
 
 async def extract_keywords(query: str, groq_api_key: str = "") -> dict:
