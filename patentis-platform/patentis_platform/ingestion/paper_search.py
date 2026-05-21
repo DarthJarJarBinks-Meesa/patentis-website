@@ -1,0 +1,130 @@
+"""Literature search — PubMed (ported from patentisv1 paper_search.py)."""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from typing import Any
+
+import httpx
+
+PUBMED_ESEARCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+PUBMED_EFETCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+
+
+@dataclass
+class PaperHit:
+    external_id: str
+    title: str
+    abstract: str
+    url: str
+    source: str
+    authors: list[str] | None = None
+    published: str | None = None
+
+    def to_metadata(self) -> dict[str, Any]:
+        return {
+            "external_id": self.external_id,
+            "url": self.url,
+            "source": self.source,
+            "authors": self.authors or [],
+            "published": self.published,
+        }
+
+
+async def search_pubmed(keywords: list[str], limit: int = 12) -> list[PaperHit]:
+    terms = " AND ".join(f'"{kw}"[Title/Abstract]' for kw in keywords[:4])
+    if not terms:
+        return []
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            search_resp = await client.get(
+                PUBMED_ESEARCH,
+                params={
+                    "db": "pubmed",
+                    "term": terms,
+                    "retmode": "json",
+                    "retmax": limit,
+                    "sort": "relevance",
+                },
+            )
+            search_resp.raise_for_status()
+            pmids = search_resp.json().get("esearchresult", {}).get("idlist", [])
+    except Exception:
+        return []
+
+    if not pmids:
+        return []
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            fetch_resp = await client.get(
+                PUBMED_EFETCH,
+                params={
+                    "db": "pubmed",
+                    "id": ",".join(pmids),
+                    "retmode": "xml",
+                    "rettype": "abstract",
+                },
+            )
+            fetch_resp.raise_for_status()
+            xml = fetch_resp.text
+    except Exception:
+        return []
+
+    return _parse_pubmed_xml(xml)
+
+
+def _parse_pubmed_xml(xml: str) -> list[PaperHit]:
+    papers: list[PaperHit] = []
+    articles = re.findall(r"<PubmedArticle>(.*?)</PubmedArticle>", xml, re.DOTALL)
+
+    for art in articles:
+        pmid_match = re.search(r"<PMID[^>]*>(\d+)</PMID>", art)
+        if not pmid_match:
+            continue
+        pmid = pmid_match.group(1)
+
+        title_match = re.search(r"<ArticleTitle>(.*?)</ArticleTitle>", art, re.DOTALL)
+        title = re.sub(r"<[^>]+>", "", title_match.group(1)).strip() if title_match else ""
+        if not title:
+            continue
+
+        abstract = ""
+        abstract_match = re.search(r"<Abstract>(.*?)</Abstract>", art, re.DOTALL)
+        if abstract_match:
+            abstract = re.sub(r"<[^>]+>", " ", abstract_match.group(1))
+            abstract = re.sub(r"\s+", " ", abstract).strip()
+
+        authors: list[str] = []
+        for author_match in re.finditer(r"<Author[^>]*>(.*?)</Author>", art, re.DOTALL):
+            a = author_match.group(1)
+            last = re.search(r"<LastName>(.*?)</LastName>", a)
+            first = re.search(r"<ForeName>(.*?)</ForeName>", a)
+            if last:
+                name = (
+                    f"{first.group(1).strip()} {last.group(1).strip()}".strip()
+                    if first
+                    else last.group(1).strip()
+                )
+                authors.append(name)
+            if len(authors) >= 6:
+                break
+
+        year_match = re.search(r"<PubDate>.*?<Year>(\d{4})</Year>", art, re.DOTALL)
+        pub_date = year_match.group(1) if year_match else ""
+
+        papers.append(
+            PaperHit(
+                external_id=f"pubmed_{pmid}",
+                title=title,
+                abstract=abstract,
+                url=f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+                source="pubmed",
+                authors=authors,
+                published=pub_date,
+            )
+        )
+
+    return papers

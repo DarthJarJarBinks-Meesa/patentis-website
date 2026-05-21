@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpportunityBrief",
+  "type": "object",
+  "required": [
+    "title",
+    "gap_summary",
+    "why_exists",
+    "assignee_landscape",
+    "enabling_science",
+    "product_directions",
+    "confidence",
+    "disclaimers"
+  ],
+  "properties": {
+    "title": { "type": "string" },
+    "gap_summary": { "type": "string" },
+    "why_exists": { "type": "string" },
+    "assignee_landscape": { "type": "string" },
+    "enabling_science": { "type": "string" },
+    "product_directions": { "type": "array", "items": { "type": "string" } },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "disclaimers": { "type": "string" }
+  }
+}

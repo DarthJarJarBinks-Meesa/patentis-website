@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+*.joblib
+web/node_modules/
+web/.next/
+.pytest_cache/
+patentis_platform/scoring/artifacts/
