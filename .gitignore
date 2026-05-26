@@ -1,0 +1,13 @@
+.DS_Store
+.Rhistory
+
+# App — Python virtualenv and runtime data
+app/backend/.venv/
+app/backend/.env
+app/backend/data/
+**/__pycache__/
+**/*.pyc
+
+# App — Node build artifacts
+app/frontend/node_modules/
+app/frontend/dist/

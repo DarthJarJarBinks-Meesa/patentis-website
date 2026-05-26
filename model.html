@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Live site: https://darthjarjarbinks-meesa.github.io/patentis-website/ -->
+  <meta name="description" content="Patentis open-source prototype — a fully working patent whitespace discovery app you can run locally today.">
+  <meta name="theme-color" content="#070b14">
+  <meta name="robots" content="index,follow">
+  <link rel="canonical" href="https://darthjarjarbinks-meesa.github.io/patentis-website/model.html">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Patentis">
+  <meta property="og:title" content="Demo | Patentis">
+  <meta property="og:description" content="The Patentis prototype is open source and fully functional. Run it yourself in minutes.">
+  <meta property="og:url" content="https://darthjarjarbinks-meesa.github.io/patentis-website/model.html">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Demo | Patentis">
+  <meta name="twitter:description" content="Open-source patent whitespace discovery prototype — search, analyze, and generate ideas in minutes.">
+  <title>Demo | Patentis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="model">
+  <header class="site-header">
+    <nav class="nav-shell">
+      <a class="wordmark" href="index.html">PATENTIS</a>
+      <button class="menu-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
+        <li><a href="potential.html">Potential</a></li>
+        <li><a class="active" href="model.html">Demo</a></li>
+        <li><a href="contact.html">Contact</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main>
+    <div class="constellation-layer" aria-hidden="true">
+      <canvas id="constellationCanvas"></canvas>
+    </div>
+
+    <section class="section shell">
+      <p class="eyebrow reveal">Open Source Prototype</p>
+      <h1 class="section-title reveal">The demo is live.</h1>
+      <p class="reveal" style="color: var(--muted); font-size: 1.1rem; max-width: 640px; margin-bottom: 2rem;">
+        The core search, analysis, and idea-generation pipeline is fully functional and open source. Run it yourself in a few minutes — all you need is a free Groq API key.
+      </p>
+      <a href="https://github.com/Natheoah/patentisv1" class="button-link reveal" target="_blank" rel="noopener noreferrer">
+        View on GitHub →
+      </a>
+    </section>
+
+    <section class="section shell">
+      <h2 class="section-title reveal">What it does</h2>
+      <div class="steps-grid">
+        <article class="step-card reveal">
+          <span class="step-index">01</span>
+          <h3>Search</h3>
+          <p>Describe a technology area. The app extracts keywords and queries USPTO, EPO, arXiv, and Semantic Scholar in parallel.</p>
+        </article>
+        <article class="step-card reveal">
+          <span class="step-index">02</span>
+          <h3>Analyze</h3>
+          <p>An LLM reads the retrieved patents and papers and produces a landscape map: covered territory, gaps, and research directions.</p>
+        </article>
+        <article class="step-card reveal">
+          <span class="step-index">03</span>
+          <h3>Generate</h3>
+          <p>Generates novel product ideas targeting identified gaps, then runs an infringement check on whichever idea you select.</p>
+        </article>
+        <article class="step-card reveal">
+          <span class="step-index">04</span>
+          <h3>Develop</h3>
+          <p>A guided chat interface with full patent context helps you think through building the idea without infringing existing IP.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section shell">
+      <h2 class="section-title reveal">Models powering it</h2>
+      <div class="steps-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr));">
+        <article class="step-card reveal">
+          <span class="step-index" style="font-size: 0.72rem;">INSTRUCTION</span>
+          <h3>Llama 3.3 70B</h3>
+          <p>Keyword extraction from natural-language queries and guided development chat. Fast, accurate, cost-efficient.</p>
+        </article>
+        <article class="step-card reveal">
+          <span class="step-index" style="font-size: 0.72rem;">REASONING</span>
+          <h3>Qwen3 32B</h3>
+          <p>Patent landscape analysis, innovation idea generation, and infringement checking. Deep chain-of-thought reasoning over long patent contexts.</p>
+        </article>
+      </div>
+      <p class="reveal" style="color: var(--muted); margin-top: 1.2rem; font-size: 0.95rem;">
+        Both models run on <a href="https://groq.com" target="_blank" rel="noopener noreferrer" style="color: #a7c5ff; border-bottom: 1px solid #3e63a8;">Groq</a> inference — free tier covers typical usage.
+      </p>
+    </section>
+
+    <section class="section shell">
+      <h2 class="section-title reveal">Run it in 3 steps</h2>
+      <div class="steps-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+        <article class="step-card reveal">
+          <span class="step-index">01</span>
+          <h3>Clone</h3>
+          <p style="font-family: monospace; font-size: 0.88rem; color: #a7c5ff;">git clone github.com/Natheoah/patentisv1</p>
+        </article>
+        <article class="step-card reveal">
+          <span class="step-index">02</span>
+          <h3>Start</h3>
+          <p style="font-family: monospace; font-size: 0.88rem; color: #a7c5ff;">cd patentisv1 &amp;&amp; ./start.sh</p>
+        </article>
+        <article class="step-card reveal">
+          <span class="step-index">03</span>
+          <h3>Search</h3>
+          <p>Open localhost:5173, enter your free Groq API key, and describe a technology area.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="full-cta reveal">
+        <h2>Want the production platform?</h2>
+        <a href="contact.html" class="button-link">Request early access</a>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

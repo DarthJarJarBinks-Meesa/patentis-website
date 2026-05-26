@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-950 text-gray-100 antialiased;
+  }
+  ::-webkit-scrollbar {
+    @apply w-1.5;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-600 rounded-full;
+  }
+}
+
+@layer utilities {
+  .prose-patent {
+    @apply prose prose-invert prose-sm max-w-none
+      prose-headings:text-indigo-300
+      prose-strong:text-gray-100
+      prose-code:text-indigo-300
+      prose-pre:bg-gray-800;
+  }
+}

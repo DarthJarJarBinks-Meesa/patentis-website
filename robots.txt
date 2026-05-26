@@ -1,0 +1,5 @@
+# https://darthjarjarbinks-meesa.github.io/patentis-website/
+User-agent: *
+Allow: /
+
+Sitemap: https://darthjarjarbinks-meesa.github.io/patentis-website/sitemap.xml
