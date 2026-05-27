@@ -63,6 +63,7 @@ async def chat_stream(
                             yield content
             return
         except httpx.HTTPStatusError as exc:
+            await exc.response.aread()
             body = exc.response.text[:500]
             print(f"[llm] HTTP {exc.response.status_code} | model={model} | payload={payload_bytes}B | {body}")
             if exc.response.status_code != 429 or attempt >= 3:
