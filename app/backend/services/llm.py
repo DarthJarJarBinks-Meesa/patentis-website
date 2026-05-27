@@ -8,7 +8,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_BASE = "https://api.groq.com/openai/v1"
 
 INSTRUCTION_MODEL = os.getenv("INSTRUCTION_MODEL", "llama-3.3-70b-versatile")
-REASONING_MODEL = os.getenv("REASONING_MODEL", "deepseek-r1-distill-llama-70b")
+REASONING_MODEL = os.getenv("REASONING_MODEL", "llama-3.3-70b-versatile")
 
 
 def _headers(groq_api_key: str = "") -> dict:
