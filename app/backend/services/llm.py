@@ -50,6 +50,8 @@ async def chat_stream(
                     headers=_headers(groq_api_key),
                     json=payload,
                 ) as response:
+                    if response.status_code >= 400:
+                        await response.aread()
                     response.raise_for_status()
                     async for line in response.aiter_lines():
                         if not line or not line.startswith("data: "):
@@ -63,7 +65,6 @@ async def chat_stream(
                             yield content
             return
         except httpx.HTTPStatusError as exc:
-            await exc.response.aread()
             body = exc.response.text[:500]
             print(f"[llm] HTTP {exc.response.status_code} | model={model} | payload={payload_bytes}B | {body}")
             if exc.response.status_code != 429 or attempt >= 3:
