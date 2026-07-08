@@ -17,10 +17,10 @@ interface ConvMessage {
 }
 
 const EXAMPLES = [
-  'Spine implants',
-  'Drug-eluting coronary stents',
-  'Wearable continuous glucose monitors',
-  'Orthopedic bone screw fixation',
+  'Resorbable interbody spinal cage with antibiotic elution',
+  'Drug-eluting coronary stent with biodegradable polymer coating',
+  'Continuous glucose monitor using interstitial fluid optical sensing',
+  'Pedicle screw with variable-angle locking mechanism',
 ]
 
 let _msgCounter = 0
@@ -322,14 +322,14 @@ export default function ConversationPage() {
         <div className="w-full max-w-2xl">
           <div className="text-center mb-10">
             <h1 className="text-4xl font-bold text-white mb-3">
-              Your R&D patent advisor
+              FTO & Patent Landscape Scout
             </h1>
             <p className="text-gray-400 text-lg">
-              Describe a technology domain. I'll map the patent landscape, surface whitespace, and help you develop ideas — all in one conversation.
+              Describe a device concept or technology area. I'll search US and EPO/PCT patents, map what's covered, and generate a structured FTO brief you can hand to counsel.
             </p>
           </div>
 
-          {/* Domain input */}
+          {/* Concept input */}
           <div className="relative">
             <textarea
               value={queryInput}
@@ -340,7 +340,7 @@ export default function ConversationPage() {
                   handleStart(queryInput)
                 }
               }}
-              placeholder="e.g. spine implants, drug-eluting coronary stents, wearable biosensors…"
+              placeholder="Describe your design concept or technology area — e.g. resorbable spinal cage with antibiotic elution…"
               rows={3}
               className="w-full rounded-2xl bg-gray-800 border border-gray-600 px-5 py-4 text-gray-100 placeholder-gray-500 text-base resize-none focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
             />
@@ -398,12 +398,26 @@ export default function ConversationPage() {
             </p>
           )}
         </div>
-        <button
-          onClick={handleReset}
-          className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
-        >
-          New domain
-        </button>
+        <div className="flex items-center gap-3">
+          {phase === 'chat' && (
+            <button
+              onClick={() => window.print()}
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1"
+              title="Print / export as PDF"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Export
+            </button>
+          )}
+          <button
+            onClick={handleReset}
+            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            New search
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -432,7 +446,7 @@ export default function ConversationPage() {
                   sendMessage(chatInput)
                 }
               }}
-              placeholder="Ask about the landscape, explore an idea, or describe your own concept…"
+              placeholder="Describe your design concept for an FTO check, or ask about the patent landscape…"
               rows={2}
               disabled={responding}
               className="w-full rounded-2xl bg-gray-800 border border-gray-600 px-4 py-3 pr-14 text-gray-100 placeholder-gray-500 text-sm resize-none focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 transition-colors"
@@ -455,7 +469,7 @@ export default function ConversationPage() {
             </button>
           </div>
           <p className="mt-1.5 text-xs text-gray-600 text-center">
-            Describe your own idea and I'll check it for patent conflicts · Patent context loaded for this session
+            Describe a concept for an FTO check with citations and confidence levels · US + EPO/PCT patents loaded
           </p>
         </div>
       )}

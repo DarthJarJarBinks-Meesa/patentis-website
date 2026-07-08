@@ -197,23 +197,44 @@ async def select_idea(session_id: str, req: SelectIdeaRequest, groq_key: str = D
         {
             "role": "system",
             "content": (
-                "You are a patent attorney specializing in medtech. Assess whether the proposed idea "
-                "would infringe on any of the listed patents. Be specific: cite patent titles and explain "
-                "the risk level. Also identify safe design-around strategies."
+                "You are a patent research assistant generating structured FTO (Freedom to Operate) "
+                "landscape reports for medtech R&D engineers. Your output will be handed directly to "
+                "patent counsel. EVERY flagged element must cite a specific, verifiable patent number "
+                "and the exact relevant claim or passage. Never make an unsourced assertion. "
+                "Use exactly three confidence levels: 'Likely blocked', 'Worth reviewing', 'Appears clear'."
             ),
         },
         {
             "role": "user",
             "content": (
-                f"Proposed idea: {selected.get('title')}\n\n"
+                f"Design concept: {selected.get('title')}\n\n"
                 f"Description: {selected.get('description')}\n\n"
                 f"Technical approach: {selected.get('technical_approach')}\n\n"
-                f"Existing patents to check against:\n{patent_context}\n\n"
-                "Provide:\n"
-                "1. **Infringement Risk Assessment** (Low / Medium / High) with reasoning\n"
-                "2. **Specific Patent Conflicts** (if any) — which patents and which claims\n"
-                "3. **Safe Design-Around Strategies** — how to ensure non-infringement\n"
-                "4. **Patentability Assessment** — what aspects of this idea could be patented"
+                f"Patent corpus:\n{patent_context}\n\n"
+                "Generate a structured FTO landscape report:\n\n"
+                "## Patent Landscape Summary\n"
+                "2-3 sentences on patent density and key assignees in this space.\n\n"
+                "## Relevant Patents Found\n"
+                "For each relevant patent:\n"
+                "**[Patent Number]** — Title (Assignee, Year)\n"
+                "Relevant claim/passage: [specific claim text or close paraphrase with claim number]\n"
+                "Relevance: [1 sentence]\n\n"
+                "## FTO Element-by-Element Analysis\n"
+                "For each distinct technical element of the proposed concept:\n"
+                "**Element**: [specific technical element]\n"
+                "**Assessment**: Likely blocked | Worth reviewing | Appears clear\n"
+                "**Basis**: [Patent number + claim number or passage — required for every non-clear flag]\n\n"
+                "Definitions: 'Likely blocked' = direct overlap with existing claims; "
+                "'Worth reviewing' = possible overlap, attorney review needed; "
+                "'Appears clear' = no direct overlap in searched corpus.\n\n"
+                "## Design-Around Strategies\n"
+                "For 'Likely blocked' or 'Worth reviewing' elements, specific modifications to avoid infringement.\n\n"
+                "## Patentability Assessment\n"
+                "Which elements appear novel and potentially patentable, with reasoning.\n\n"
+                "## Search Scope & Limitations\n"
+                "State: 'This FTO analysis covers US patents and EPO/PCT filings in the searched corpus. "
+                "It is a research triage tool, not a legal opinion. All findings should be reviewed "
+                "by qualified patent counsel before any filing or commercialization decision.'"
             ),
         },
     ]
@@ -267,23 +288,43 @@ async def evaluate_idea(session_id: str, req: EvaluateIdeaRequest, groq_key: str
         {
             "role": "system",
             "content": (
-                "You are a patent attorney specializing in medical device and technology patents. "
-                "Assess whether the proposed idea would infringe on any of the listed patents. "
-                "Be specific: cite patent titles and explain the risk level. "
-                "Also identify safe design-around strategies and novel aspects that could be patented."
+                "You are a patent research assistant generating structured FTO (Freedom to Operate) "
+                "landscape reports for medtech R&D engineers. Your output will be handed directly to "
+                "patent counsel. EVERY flagged element must cite a specific, verifiable patent number "
+                "and the exact relevant claim or passage. Never make an unsourced assertion. "
+                "Use exactly three confidence levels: 'Likely blocked', 'Worth reviewing', 'Appears clear'."
             ),
         },
         {
             "role": "user",
             "content": (
-                f"Proposed idea: {req.idea_title}\n\n"
+                f"Design concept: {req.idea_title}\n\n"
                 f"Description: {req.idea_description}\n\n"
-                f"Existing patents to check against:\n{patent_context}\n\n"
-                "Provide:\n"
-                "1. **Infringement Risk Assessment** (Low / Medium / High) with clear reasoning\n"
-                "2. **Specific Patent Conflicts** — which patents and which claims pose risks\n"
-                "3. **Safe Design-Around Strategies** — how to modify the idea to ensure non-infringement\n"
-                "4. **Patentability Assessment** — which aspects of this idea appear novel and potentially patentable"
+                f"Patent corpus:\n{patent_context}\n\n"
+                "Generate a structured FTO landscape report:\n\n"
+                "## Patent Landscape Summary\n"
+                "2-3 sentences on patent density and key assignees in this space.\n\n"
+                "## Relevant Patents Found\n"
+                "For each relevant patent:\n"
+                "**[Patent Number]** — Title (Assignee, Year)\n"
+                "Relevant claim/passage: [specific claim text or close paraphrase with claim number]\n"
+                "Relevance: [1 sentence]\n\n"
+                "## FTO Element-by-Element Analysis\n"
+                "For each distinct technical element of the proposed concept:\n"
+                "**Element**: [specific technical element]\n"
+                "**Assessment**: Likely blocked | Worth reviewing | Appears clear\n"
+                "**Basis**: [Patent number + claim number or passage — required for every non-clear flag]\n\n"
+                "Definitions: 'Likely blocked' = direct overlap with existing claims; "
+                "'Worth reviewing' = possible overlap, attorney review needed; "
+                "'Appears clear' = no direct overlap in searched corpus.\n\n"
+                "## Design-Around Strategies\n"
+                "For 'Likely blocked' or 'Worth reviewing' elements, specific modifications to avoid infringement.\n\n"
+                "## Patentability Assessment\n"
+                "Which elements appear novel and potentially patentable, with reasoning.\n\n"
+                "## Search Scope & Limitations\n"
+                "State: 'This FTO analysis covers US patents and EPO/PCT filings in the searched corpus. "
+                "It is a research triage tool, not a legal opinion. All findings should be reviewed "
+                "by qualified patent counsel before any filing or commercialization decision.'"
             ),
         },
     ]

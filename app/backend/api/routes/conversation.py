@@ -142,7 +142,10 @@ async def start_conversation(req: ConversationStartRequest, groq_key: str = Depe
                         "## Research Directions\n"
                         "What technical directions are being explored in papers but not yet patented?\n\n"
                         "## Opportunity Summary\n"
-                        "2-3 sentences on the most promising white spaces."
+                        "2-3 sentences on the most promising white spaces.\n\n"
+                        "## Search Scope\n"
+                        "State: 'This landscape covers US patents and EPO/PCT filings. "
+                        "It is a research triage tool, not a legal FTO opinion.'"
                     ),
                 },
             ]
