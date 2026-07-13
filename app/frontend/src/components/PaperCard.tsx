@@ -8,10 +8,12 @@ interface Props {
 
 const SOURCE_BADGE: Record<string, string> = {
   pubmed: 'bg-blue-900/60 text-blue-300 border-blue-700',
+  semantic_scholar: 'bg-emerald-900/60 text-emerald-300 border-emerald-700',
 }
 
 const SOURCE_LABEL: Record<string, string> = {
   pubmed: 'PubMed',
+  semantic_scholar: 'Semantic Scholar',
 }
 
 export default function PaperCard({ paper, selected, onToggle }: Props) {

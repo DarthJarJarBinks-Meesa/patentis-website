@@ -3,7 +3,7 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import search, session, analysis, ideas, chat
+from api.routes import search, session, analysis, ideas, chat, conversation
 from services import llm as llm_service
 
 app = FastAPI(title="Patentis API", version="1.0.0")
@@ -21,6 +21,7 @@ app.include_router(session.router, prefix="/api")
 app.include_router(analysis.router, prefix="/api")
 app.include_router(ideas.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(conversation.router, prefix="/api")
 
 
 @app.get("/api/health")

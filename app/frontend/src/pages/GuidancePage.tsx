@@ -4,11 +4,12 @@ import { useStore } from '../store'
 import { streamChat } from '../api/client'
 
 const STARTER_PROMPTS = [
-  'What should be my first steps to develop this idea?',
-  'What technical challenges should I anticipate?',
-  'Which research labs or academic groups are working in this space?',
-  'What does a realistic development roadmap look like?',
-  'How should I structure the patent application?',
+  'What are the key technical risks and how should I de-risk them?',
+  'Which existing patents should I design around, and how?',
+  'What preclinical testing or validation would a regulatory body expect?',
+  'Which research groups or institutions are leaders in this space?',
+  'How should I structure a provisional patent application for this idea?',
+  'What materials or manufacturing challenges should I anticipate?',
 ]
 
 export default function GuidancePage() {
@@ -16,6 +17,7 @@ export default function GuidancePage() {
     sessionId,
     ideas,
     selectedIdeaIndex,
+    userIdea,
     messages,
     addMessage,
     appendLastAssistant,
@@ -30,6 +32,7 @@ export default function GuidancePage() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const selectedIdea = selectedIdeaIndex !== null ? ideas[selectedIdeaIndex] : null
+  const activeIdeaTitle = selectedIdea?.title ?? userIdea?.title ?? null
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -64,8 +67,8 @@ export default function GuidancePage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-white">Development Guide</h2>
-            {selectedIdea && (
-              <p className="text-indigo-300 text-sm mt-0.5 font-medium">{selectedIdea.title}</p>
+            {activeIdeaTitle && (
+              <p className="text-indigo-300 text-sm mt-0.5 font-medium">{activeIdeaTitle}</p>
             )}
           </div>
           <button
@@ -90,7 +93,7 @@ export default function GuidancePage() {
             <div className="rounded-2xl bg-gray-800/50 border border-gray-700 p-4 text-sm text-gray-300">
               <p className="font-medium text-gray-100 mb-1">Ready to help you build.</p>
               <p className="text-gray-400">
-                Ask me anything about developing <span className="text-indigo-300">{selectedIdea?.title}</span>. I have full context of the patent landscape and infringement analysis.
+                Ask me anything about developing <span className="text-indigo-300">{activeIdeaTitle}</span>. I have full context of the patent landscape and conflict analysis.
               </p>
             </div>
             <div>
@@ -164,7 +167,7 @@ export default function GuidancePage() {
           </button>
         </div>
         <p className="mt-1.5 text-xs text-gray-600 text-center">
-          Powered by llama3.2 · Patent context from your selected documents
+          Patent context from your selected documents · Conflict analysis included
         </p>
       </div>
     </div>

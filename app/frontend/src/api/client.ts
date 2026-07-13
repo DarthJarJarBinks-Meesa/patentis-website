@@ -38,10 +38,25 @@ export function streamGenerateIdeas(sessionId: string) {
   return streamSSE(`${BASE}/session/${sessionId}/generate-ideas`, { method: 'POST' })
 }
 
+export interface SSEEvent {
+  // Standard fields
+  content?: string
+  done?: boolean
+  error?: string
+  status?: string
+  ideas?: unknown
+  // Conversation start events
+  type?: string
+  message?: string
+  session_id?: string
+  patent_count?: number
+  paper_count?: number
+}
+
 export async function* streamSSE(
   url: string,
   options?: RequestInit,
-): AsyncGenerator<{ content?: string; done?: boolean; error?: string; status?: string; ideas?: unknown }> {
+): AsyncGenerator<SSEEvent> {
   const res = await fetch(url, {
     ...options,
     headers: {
@@ -90,6 +105,22 @@ export function streamSelectIdea(sessionId: string, ideaIndex: number) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ idea_index: ideaIndex }),
+  })
+}
+
+export function streamEvaluateIdea(sessionId: string, ideaTitle: string, ideaDescription: string) {
+  return streamSSE(`${BASE}/session/${sessionId}/evaluate-idea`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idea_title: ideaTitle, idea_description: ideaDescription }),
+  })
+}
+
+export function startConversation(query: string) {
+  return streamSSE(`${BASE}/conversation/start`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
   })
 }
 

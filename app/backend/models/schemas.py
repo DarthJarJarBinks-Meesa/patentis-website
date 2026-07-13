@@ -51,6 +51,8 @@ class Session(BaseModel):
     analysis: Optional[str] = None
     ideas: list[dict] = []
     selected_idea_index: Optional[int] = None
+    # Engineer-submitted idea (alternative to AI-generated ideas)
+    user_idea: Optional[dict] = None  # {"title": str, "description": str}
     infringement_check: Optional[str] = None
     messages: list[dict] = []
 
@@ -75,6 +77,11 @@ class SelectionRequest(BaseModel):
 
 class SelectIdeaRequest(BaseModel):
     idea_index: int
+
+
+class EvaluateIdeaRequest(BaseModel):
+    idea_title: str = Field(..., min_length=1, max_length=200)
+    idea_description: str = Field(..., min_length=10, max_length=3000)
 
 
 class ChatRequest(BaseModel):

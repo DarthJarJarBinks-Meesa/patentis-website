@@ -1,5 +1,28 @@
 import { create } from 'zustand'
-import type { Patent, Paper, Idea, ChatMessage, Step } from './types'
+import type { Patent, Paper, Idea, ChatMessage, Step, UserIdea } from './types'
+import { setGroqApiKey as syncClientKey } from './api/client'
+
+const _GROQ_KEY_STORAGE = 'patentis_groq_api_key'
+
+function loadGroqKey(): string {
+  try {
+    return localStorage.getItem(_GROQ_KEY_STORAGE) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function saveGroqKey(key: string): void {
+  try {
+    if (key) {
+      localStorage.setItem(_GROQ_KEY_STORAGE, key)
+    } else {
+      localStorage.removeItem(_GROQ_KEY_STORAGE)
+    }
+  } catch {
+    // ignore storage errors (e.g. private browsing quota)
+  }
+}
 
 interface AppState {
   step: Step
@@ -14,6 +37,8 @@ interface AppState {
   analysis: string
   ideas: Idea[]
   selectedIdeaIndex: number | null
+  userIdea: UserIdea | null
+  ideaMode: 'generate' | 'evaluate'
   infringementCheck: string
   messages: ChatMessage[]
   isLoading: boolean
@@ -32,6 +57,8 @@ interface AppState {
   appendAnalysis: (chunk: string) => void
   setIdeas: (ideas: Idea[]) => void
   selectIdea: (index: number) => void
+  setUserIdea: (idea: UserIdea | null) => void
+  setIdeaMode: (mode: 'generate' | 'evaluate') => void
   setInfringementCheck: (text: string) => void
   appendInfringementCheck: (chunk: string) => void
   addMessage: (msg: ChatMessage) => void
@@ -41,10 +68,13 @@ interface AppState {
   reset: () => void
 }
 
+const _persistedKey = loadGroqKey()
+if (_persistedKey) syncClientKey(_persistedKey)
+
 const initialState = {
   step: 1 as Step,
   sessionId: null,
-  groqApiKey: '',
+  groqApiKey: _persistedKey,
   query: '',
   keywords: {},
   patents: [],
@@ -54,6 +84,8 @@ const initialState = {
   analysis: '',
   ideas: [],
   selectedIdeaIndex: null,
+  userIdea: null,
+  ideaMode: 'generate' as const,
   infringementCheck: '',
   messages: [],
   isLoading: false,
@@ -66,7 +98,11 @@ export const useStore = create<AppState>((set) => ({
 
   setStep: (step) => set({ step }),
   setSessionId: (id) => set({ sessionId: id }),
-  setGroqApiKey: (key) => set({ groqApiKey: key }),
+  setGroqApiKey: (key) => {
+    saveGroqKey(key)
+    syncClientKey(key)
+    set({ groqApiKey: key })
+  },
   setQuery: (q) => set({ query: q }),
   setKeywords: (k) => set({ keywords: k }),
 
@@ -96,7 +132,9 @@ export const useStore = create<AppState>((set) => ({
   appendAnalysis: (chunk) => set((s) => ({ analysis: s.analysis + chunk })),
 
   setIdeas: (ideas) => set({ ideas }),
-  selectIdea: (index) => set({ selectedIdeaIndex: index }),
+  selectIdea: (index) => set({ selectedIdeaIndex: index, userIdea: null }),
+  setUserIdea: (idea) => set({ userIdea: idea, selectedIdeaIndex: null }),
+  setIdeaMode: (mode) => set({ ideaMode: mode }),
 
   setInfringementCheck: (text) => set({ infringementCheck: text }),
   appendInfringementCheck: (chunk) =>

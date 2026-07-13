@@ -8,7 +8,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_BASE = "https://api.groq.com/openai/v1"
 
 INSTRUCTION_MODEL = os.getenv("INSTRUCTION_MODEL", "llama-3.3-70b-versatile")
-REASONING_MODEL = os.getenv("REASONING_MODEL", "qwen/qwen3-32b")
+REASONING_MODEL = os.getenv("REASONING_MODEL", "llama-3.3-70b-versatile")
 
 
 def _headers(groq_api_key: str = "") -> dict:
@@ -39,6 +39,8 @@ async def chat_stream(
     payload: dict = {"model": model, "messages": messages, "temperature": temperature, "stream": True}
     if max_tokens is not None:
         payload["max_tokens"] = max_tokens
+    payload_bytes = len(json.dumps(payload).encode())
+    print(f"[llm] chat_stream model={model} payload={payload_bytes}B max_tokens={max_tokens}")
     for attempt in range(4):
         try:
             async with httpx.AsyncClient(timeout=300.0) as client:
@@ -48,6 +50,8 @@ async def chat_stream(
                     headers=_headers(groq_api_key),
                     json=payload,
                 ) as response:
+                    if response.status_code >= 400:
+                        await response.aread()
                     response.raise_for_status()
                     async for line in response.aiter_lines():
                         if not line or not line.startswith("data: "):
@@ -61,6 +65,8 @@ async def chat_stream(
                             yield content
             return
         except httpx.HTTPStatusError as exc:
+            body = exc.response.text[:500]
+            print(f"[llm] HTTP {exc.response.status_code} | model={model} | payload={payload_bytes}B | {body}")
             if exc.response.status_code != 429 or attempt >= 3:
                 raise
             wait = float(exc.response.headers.get("retry-after", 2 ** (attempt + 1)))

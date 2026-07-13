@@ -9,7 +9,11 @@ cd "$ROOT/backend"
 
 [ -f ".env" ] && source .env
 
-uvicorn main:app --reload --port 8000 &
+# Use the venv's uvicorn if it exists, otherwise fall back to PATH
+UVICORN=".venv/bin/uvicorn"
+[ ! -f "$UVICORN" ] && UVICORN="uvicorn"
+
+$UVICORN main:app --reload --port 8000 &
 BACKEND_PID=$!
 echo "Backend → http://localhost:8000"
 

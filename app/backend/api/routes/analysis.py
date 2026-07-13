@@ -56,7 +56,16 @@ async def analyze(session_id: str, groq_key: str = Depends(get_groq_key)):
         )
 
     rag.embed_documents(session_id, documents)
-    context = "\n\n---\n\n".join(d["text"] for d in documents)
+
+    _ABSTRACT_LIMIT = 200
+    _CONTEXT_LIMIT  = 6_000
+    truncated_parts = [
+        d["text"][:_ABSTRACT_LIMIT] + ("…" if len(d["text"]) > _ABSTRACT_LIMIT else "")
+        for d in documents
+    ]
+    context = "\n\n---\n\n".join(truncated_parts)
+    if len(context) > _CONTEXT_LIMIT:
+        context = context[:_CONTEXT_LIMIT] + "\n\n[Remaining documents omitted for length]"
 
     messages = [
         {
@@ -91,7 +100,7 @@ async def analyze(session_id: str, groq_key: str = Depends(get_groq_key)):
     async def stream_analysis():
         full_response = ""
         try:
-            async for chunk in llm.chat_stream(llm.REASONING_MODEL, messages, temperature=0.3, groq_api_key=groq_key, max_tokens=4096):
+            async for chunk in llm.chat_stream(llm.REASONING_MODEL, messages, temperature=0.3, groq_api_key=groq_key, max_tokens=2048):
                 full_response += chunk
                 yield f"data: {json.dumps({'content': chunk})}\n\n"
             session_store.update_session(session_id, {"analysis": strip_think(full_response)})

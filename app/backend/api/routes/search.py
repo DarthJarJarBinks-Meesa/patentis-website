@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from models.schemas import SearchRequest, SearchResponse
 from services import session_store, llm
 from services.patent_search import search_google_patents, search_epo
-from services.paper_search import search_pubmed
+from services.paper_search import search_pubmed, search_semantic_scholar
 from api.deps import get_groq_key
 
 router = APIRouter()
@@ -16,10 +16,11 @@ async def search(req: SearchRequest, groq_key: str = Depends(get_groq_key)):
     broad_terms: list[str] = keywords_data.get("broad_terms", [])
     search_terms = keywords + broad_terms
 
-    patents_results, epo_results, pubmed_results = await asyncio.gather(
+    patents_results, epo_results, pubmed_results, ss_results = await asyncio.gather(
         search_google_patents(search_terms, limit=15),
         search_epo(keywords, limit=8),
         search_pubmed(search_terms, limit=15),
+        search_semantic_scholar(search_terms, limit=10),
         return_exceptions=True,
     )
 
@@ -29,8 +30,9 @@ async def search(req: SearchRequest, groq_key: str = Depends(get_groq_key)):
             patents.extend(result)
 
     papers = []
-    if isinstance(pubmed_results, list):
-        papers.extend(pubmed_results)
+    for result in [pubmed_results, ss_results]:
+        if isinstance(result, list):
+            papers.extend(result)
 
     # Deduplicate by title similarity (simple exact-title dedup)
     seen_titles: set[str] = set()

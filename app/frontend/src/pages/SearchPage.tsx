@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../store'
-import { searchPatents, setGroqApiKey } from '../api/client'
+import { searchPatents } from '../api/client'
 
 const EXAMPLES = [
   'battery technology for electric vehicles',
@@ -10,15 +10,10 @@ const EXAMPLES = [
 ]
 
 export default function SearchPage() {
-  const { query, setQuery, setStep, setSessionId, setResults, setKeywords, setLoading, setError, groqApiKey, setGroqApiKey: storeSetGroqApiKey } =
+  const { query, setQuery, setStep, setSessionId, setResults, setKeywords, setLoading, setError, groqApiKey, setGroqApiKey } =
     useStore()
   const [inputVal, setInputVal] = useState(query)
   const [keyVisible, setKeyVisible] = useState(false)
-
-  const handleKeyChange = (val: string) => {
-    storeSetGroqApiKey(val)
-    setGroqApiKey(val)
-  }
 
   const handleSearch = async (q: string) => {
     if (!q.trim()) return
@@ -73,7 +68,7 @@ export default function SearchPage() {
             <input
               type={keyVisible ? 'text' : 'password'}
               value={groqApiKey}
-              onChange={(e) => handleKeyChange(e.target.value)}
+              onChange={(e) => setGroqApiKey(e.target.value)}
               placeholder="gsk_..."
               disabled={isLoading}
               className="w-full rounded-xl bg-gray-800 border border-gray-600 px-4 py-2.5 text-gray-100 placeholder-gray-600 text-sm font-mono focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 transition-colors pr-10"

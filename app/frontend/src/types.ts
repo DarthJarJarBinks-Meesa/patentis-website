@@ -17,7 +17,12 @@ export interface Paper {
   authors: string[]
   published?: string
   url: string
-  source: 'pubmed'
+  source: 'pubmed' | 'semantic_scholar'
+}
+
+export interface UserIdea {
+  title: string
+  description: string
 }
 
 export interface Idea {

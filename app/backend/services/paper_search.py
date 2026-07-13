@@ -4,28 +4,76 @@ from models.schemas import Paper
 
 PUBMED_ESEARCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 PUBMED_EFETCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+SEMANTIC_SCHOLAR_SEARCH = "https://api.semanticscholar.org/graph/v1/paper/search"
+_SS_FIELDS = "title,abstract,authors,year,externalIds,openAccessPdf"
+
+
+async def search_semantic_scholar(keywords: list[str], limit: int = 10) -> list[Paper]:
+    query = " ".join(keywords[:6])
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.get(
+                SEMANTIC_SCHOLAR_SEARCH,
+                params={"query": query, "limit": limit, "fields": _SS_FIELDS},
+                headers={"User-Agent": "Patentis/1.0 (research tool)"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception:
+        return []
+
+    papers = []
+    for item in data.get("data", []):
+        title = item.get("title", "").strip()
+        if not title:
+            continue
+        abstract = item.get("abstract") or ""
+        authors = [
+            a.get("name", "") for a in item.get("authors", []) if a.get("name")
+        ][:6]
+        year = str(item.get("year", "")) if item.get("year") else ""
+        paper_id = item.get("paperId", "")
+        url = f"https://www.semanticscholar.org/paper/{paper_id}" if paper_id else ""
+        papers.append(
+            Paper(
+                id=f"ss_{paper_id or title[:40]}",
+                title=title,
+                abstract=abstract,
+                authors=authors,
+                published=year,
+                url=url,
+                source="semantic_scholar",
+            )
+        )
+    return papers
+
+
+async def _esearch(terms: str, limit: int) -> list[str]:
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        r = await client.get(
+            PUBMED_ESEARCH,
+            params={"db": "pubmed", "term": terms, "retmode": "json", "retmax": limit, "sort": "relevance"},
+        )
+        r.raise_for_status()
+        return r.json().get("esearchresult", {}).get("idlist", [])
 
 
 async def search_pubmed(keywords: list[str], limit: int = 12) -> list[Paper]:
-    # Build a focused query using title/abstract fields
-    terms = " AND ".join(f'"{kw}"[Title/Abstract]' for kw in keywords[:4])
+    # Try progressively relaxed queries: 2-keyword AND, then OR across all keywords.
+    pmids: list[str] = []
+    if keywords:
+        try:
+            tight = " AND ".join(f'"{kw}"[Title/Abstract]' for kw in keywords[:2])
+            pmids = await _esearch(tight, limit)
+        except Exception:
+            pass
 
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            search_resp = await client.get(
-                PUBMED_ESEARCH,
-                params={
-                    "db": "pubmed",
-                    "term": terms,
-                    "retmode": "json",
-                    "retmax": limit,
-                    "sort": "relevance",
-                },
-            )
-            search_resp.raise_for_status()
-            pmids = search_resp.json().get("esearchresult", {}).get("idlist", [])
-    except Exception:
-        return []
+    if len(pmids) < 5 and keywords:
+        try:
+            broad = " OR ".join(f'"{kw}"[Title/Abstract]' for kw in keywords[:5])
+            pmids = await _esearch(broad, limit)
+        except Exception:
+            pass
 
     if not pmids:
         return []

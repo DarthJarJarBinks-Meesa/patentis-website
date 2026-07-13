@@ -6,7 +6,7 @@ import { streamAnalysis, streamGenerateIdeas } from '../api/client'
 import { parseThinking } from '../utils/thinking'
 
 export default function AnalysisPage() {
-  const { sessionId, analysis, appendAnalysis, setAnalysis, setIdeas, setStep, setError, error, reset } =
+  const { sessionId, analysis, appendAnalysis, setAnalysis, setIdeas, setStep, setIdeaMode, setError, error, reset } =
     useStore()
 
   const [streaming, setStreaming] = useState(false)
@@ -141,23 +141,32 @@ export default function AnalysisPage() {
         >
           ← Back to review
         </button>
-        <button
-          onClick={handleGenerateIdeas}
-          disabled={!analysis || streaming || generatingIdeas}
-          className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-xl px-6 py-2.5 text-sm font-semibold transition-colors flex items-center gap-2"
-        >
-          {generatingIdeas ? (
-            <>
-              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              {generatingStatus || 'Starting…'}
-            </>
-          ) : (
-            'Generate Ideas →'
-          )}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => { setIdeaMode('evaluate'); setStep(4) }}
+            disabled={!analysis || streaming}
+            className="border border-indigo-500 text-indigo-300 hover:bg-indigo-950 disabled:border-gray-700 disabled:text-gray-500 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors"
+          >
+            I Have an Idea →
+          </button>
+          <button
+            onClick={handleGenerateIdeas}
+            disabled={!analysis || streaming || generatingIdeas}
+            className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-xl px-6 py-2.5 text-sm font-semibold transition-colors flex items-center gap-2"
+          >
+            {generatingIdeas ? (
+              <>
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                {generatingStatus || 'Starting…'}
+              </>
+            ) : (
+              'Generate Ideas →'
+            )}
+          </button>
+        </div>
       </div>
     </div>
   )

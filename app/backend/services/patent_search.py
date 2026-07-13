@@ -1,5 +1,8 @@
+import logging
 import httpx
 from models.schemas import Patent
+
+logger = logging.getLogger(__name__)
 
 GOOGLE_PATENTS_XHR = "https://patents.google.com/xhr/query"
 _HEADERS = {
@@ -20,8 +23,13 @@ async def search_google_patents(keywords: list[str], limit: int = 15) -> list[Pa
                 headers=_HEADERS,
             )
             response.raise_for_status()
+            ct = response.headers.get("content-type", "")
+            if "application/json" not in ct:
+                logger.warning("Google Patents returned non-JSON response (content-type: %s) — scraping endpoint may have changed", ct)
+                return []
             data = response.json()
-    except Exception:
+    except Exception as exc:
+        logger.warning("Google Patents search failed: %s", exc)
         return []
 
     patents = []
