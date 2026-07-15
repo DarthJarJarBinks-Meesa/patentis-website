@@ -88,9 +88,52 @@ a {
 }
 
 .wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   font-size: 0.95rem;
+  color: #f5f9ff;
+}
+
+.wordmark img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Full lockup sits on a soft plate so navy type stays readable on dark UI */
+.brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 0.7rem 0.95rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.brand-lockup img {
+  display: block;
+  width: min(140px, 40vw);
+  height: auto;
+}
+
+.hero-brand {
+  margin: 0 auto 1.15rem;
+  display: grid;
+  place-items: center;
+}
+
+.hero-mark {
+  width: clamp(72px, 12vw, 104px);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 0 22px rgba(46, 123, 255, 0.35));
 }
 
 .nav-links {
