@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
+import PatentMarkdown from '../components/PatentMarkdown'
 import ThinkingBlock from '../components/ThinkingBlock'
-import { startConversation, streamChat } from '../api/client'
+import { startConversation, streamChat, getSession } from '../api/client'
 import { parseThinking } from '../utils/thinking'
-import type { Idea } from '../types'
+import type { Idea, Patent, Paper } from '../types'
 
 type MsgType = 'status' | 'analysis' | 'ideas' | 'text'
 
@@ -34,6 +34,8 @@ export default function ConversationPage() {
 
   // Session (set once search_done event arrives)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [patents, setPatents] = useState<Patent[]>([])
+  const [papers, setPapers] = useState<Paper[]>([])
 
   // Unified message thread
   const [messages, setMessages] = useState<ConvMessage[]>([])
@@ -87,6 +89,8 @@ export default function ConversationPage() {
     setPhase('setup')
     setError(null)
     setMessages([])
+    setPatents([])
+    setPapers([])
 
     let analysisId = ''
 
@@ -98,10 +102,19 @@ export default function ConversationPage() {
           replaceLastStatus(event.message as string)
 
         } else if (type === 'search_done') {
-          setSessionId(event.session_id as string)
+          const sid = event.session_id as string
+          setSessionId(sid)
           replaceLastStatus(
             `Found ${event.patent_count} patents and ${event.paper_count} papers. Building knowledge base…`
           )
+          // Fire-and-forget: fetches title→url data for linkifying patent/paper
+          // references in the LLM's output. Doesn't block the setup pipeline.
+          getSession(sid)
+            .then(session => {
+              setPatents(session.patents ?? [])
+              setPapers(session.papers ?? [])
+            })
+            .catch(() => {})
 
         } else if (type === 'analysis_start') {
           analysisId = nextId()
@@ -153,18 +166,27 @@ export default function ConversationPage() {
     addMsg({ id: nextId(), role: 'user', type: 'text', content: trimmed })
 
     const replyId = nextId()
-    addMsg({ id: replyId, role: 'assistant', type: 'text', content: '', streaming: true })
+    let replyStarted = false
     setResponding(true)
 
     try {
       for await (const event of streamChat(sessionId, trimmed)) {
         if (event.error) { setError(event.error as string); break }
-        if (event.content) appendToMsg(replyId, event.content as string)
-        if (event.done) finaliseMsg(replyId)
+        if (event.status) { replaceLastStatus(event.status as string); continue }
+        if (event.content) {
+          if (!replyStarted) {
+            setMessages(prev => prev.filter(m => m.type !== 'status'))
+            addMsg({ id: replyId, role: 'assistant', type: 'text', content: '', streaming: true })
+            replyStarted = true
+          }
+          appendToMsg(replyId, event.content as string)
+        }
+        if (event.done && replyStarted) finaliseMsg(replyId)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Chat failed')
     } finally {
+      setMessages(prev => prev.filter(m => m.type !== 'status'))
       setResponding(false)
       setTimeout(() => chatInputRef.current?.focus(), 50)
     }
@@ -174,6 +196,8 @@ export default function ConversationPage() {
     setPhase('landing')
     setMessages([])
     setSessionId(null)
+    setPatents([])
+    setPapers([])
     setDomain('')
     setQueryInput('')
     setError(null)
@@ -241,7 +265,7 @@ export default function ConversationPage() {
             <div className="px-4 pb-4">
               <ThinkingBlock text={thinking} />
               <div className="prose-patent text-sm">
-                <ReactMarkdown>{response || msg.content}</ReactMarkdown>
+                <PatentMarkdown text={response || msg.content} patents={patents} papers={papers} />
                 {msg.streaming && (
                   <span className="inline-block w-1.5 h-4 bg-indigo-400 animate-pulse ml-0.5 align-text-bottom" />
                 )}
@@ -295,9 +319,7 @@ export default function ConversationPage() {
         <div className="max-w-[85%]">
           <ThinkingBlock text={thinking} />
           <div className="rounded-2xl rounded-tl-sm bg-gray-800 px-4 py-3">
-            <ReactMarkdown className="prose-patent text-sm">
-              {response || msg.content}
-            </ReactMarkdown>
+            <PatentMarkdown className="prose-patent text-sm" text={response || msg.content} patents={patents} papers={papers} />
             {msg.streaming && !msg.content && (
               <span className="flex gap-1">
                 <span className="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce [animation-delay:0ms]" />

@@ -14,6 +14,15 @@ def _collection(session_id: str):
     )
 
 
+def embed_texts(texts: list[str]) -> list[list[float]]:
+    """Shared embedding entry point so callers outside the per-session RAG store
+    (e.g. semantic re-ranking of a live search) reuse the same loaded model
+    instead of loading a second copy of it."""
+    if not texts:
+        return []
+    return _embed_model.encode(texts, show_progress_bar=False).tolist()
+
+
 def embed_documents(session_id: str, documents: list[dict]) -> None:
     """
     documents: list of {id, text, metadata}

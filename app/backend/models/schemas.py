@@ -20,8 +20,11 @@ class Paper(BaseModel):
     abstract: str
     authors: list[str] = []
     published: Optional[str] = None
+    venue: Optional[str] = None
     url: str
-    source: str  # 'pubmed'
+    source: str  # 'pubmed', 'semantic_scholar', or 'conference'
+    relevance_score: Optional[float] = None  # normalized fused rank score (conference search only)
+    matched_venue: bool = False  # True if `venue` matched the curated medtech conference registry
 
 
 class Idea(BaseModel):
@@ -68,6 +71,20 @@ class SearchResponse(BaseModel):
     patents: list[Patent]
     papers: list[Paper]
     keywords: dict
+
+
+class ConferenceSearchRequest(BaseModel):
+    query: str = Field(..., min_length=3, max_length=500)
+    domains: Optional[list[str]] = None  # e.g. ["orthopedics_spine"] — omit to search all registered domains
+    venue_only: bool = False  # restrict results to the curated conference registry
+    years_back: Optional[int] = None
+    limit: Optional[int] = None
+
+
+class ConferenceSearchResponse(BaseModel):
+    results: list[Paper]
+    keywords: dict
+    domains_available: list[str]
 
 
 class SelectionRequest(BaseModel):

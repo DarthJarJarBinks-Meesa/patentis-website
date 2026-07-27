@@ -4,6 +4,28 @@ from models.schemas import Patent
 
 logger = logging.getLogger(__name__)
 
+
+def patent_to_rag_doc(patent: Patent) -> dict:
+    """Build the {id, text, metadata} shape rag.embed_documents expects, with the
+    real publication number embedded in the text so the LLM has something citable."""
+    pub_number = patent.id.split("_", 1)[1] if "_" in patent.id else patent.id
+    text = f"PATENT {pub_number}: {patent.title}\n\nAbstract: {patent.abstract}"
+    if patent.assignee:
+        text += f"\n\nAssignee: {patent.assignee}"
+    if patent.filing_date:
+        text += f"\n\nFiling date: {patent.filing_date}"
+    text += f"\n\nSource URL: {patent.url}"
+    return {
+        "id": patent.id,
+        "text": text,
+        "metadata": {
+            "type": "patent",
+            "title": patent.title,
+            "source": patent.source,
+            "pub_number": pub_number,
+        },
+    }
+
 GOOGLE_PATENTS_XHR = "https://patents.google.com/xhr/query"
 _HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",

@@ -1,13 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
+import PatentMarkdown from '../components/PatentMarkdown'
 import ThinkingBlock from '../components/ThinkingBlock'
 import { useStore } from '../store'
 import { streamAnalysis, streamGenerateIdeas } from '../api/client'
 import { parseThinking } from '../utils/thinking'
 
 export default function AnalysisPage() {
-  const { sessionId, analysis, appendAnalysis, setAnalysis, setIdeas, setStep, setIdeaMode, setError, error, reset } =
-    useStore()
+  const {
+    sessionId,
+    analysis,
+    patents,
+    papers,
+    appendAnalysis,
+    setAnalysis,
+    setIdeas,
+    setStep,
+    setIdeaMode,
+    setError,
+    error,
+    reset,
+  } = useStore()
 
   const [streaming, setStreaming] = useState(false)
   const [generatingIdeas, setGeneratingIdeas] = useState(false)
@@ -125,7 +137,7 @@ export default function AnalysisPage() {
         {analysis && (
           <>
             <ThinkingBlock text={thinking} />
-            <ReactMarkdown className="prose-patent">{response || analysis}</ReactMarkdown>
+            <PatentMarkdown className="prose-patent" text={response || analysis} patents={patents} papers={papers} />
             {streaming && (
               <span className="inline-block w-1.5 h-4 bg-indigo-400 animate-pulse ml-0.5 align-text-bottom" />
             )}

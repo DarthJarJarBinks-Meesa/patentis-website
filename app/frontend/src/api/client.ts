@@ -20,6 +20,12 @@ export async function searchPatents(query: string) {
   return res.json()
 }
 
+export async function getSession(sessionId: string) {
+  const res = await fetch(`${BASE}/session/${sessionId}`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function updateSelection(
   sessionId: string,
   patentIds: string[],

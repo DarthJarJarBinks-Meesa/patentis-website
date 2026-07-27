@@ -25,6 +25,15 @@ export interface UserIdea {
   description: string
 }
 
+export interface FtoClearance {
+  blocked: number
+  review: number
+  clear: number
+  total: number
+  mostly_clear: boolean
+  label: string
+}
+
 export interface Idea {
   title: string
   tagline: string
@@ -35,6 +44,8 @@ export interface Idea {
   why_unpatented: string
   scientific_feasibility?: string
   supporting_research?: string
+  fto_report?: string
+  fto_clearance?: FtoClearance
 }
 
 export interface ChatMessage {

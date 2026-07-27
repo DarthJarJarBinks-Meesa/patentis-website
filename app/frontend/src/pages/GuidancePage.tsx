@@ -19,6 +19,8 @@ export default function GuidancePage() {
     selectedIdeaIndex,
     userIdea,
     messages,
+    patents,
+    papers,
     addMessage,
     appendLastAssistant,
     setStep,
@@ -115,7 +117,7 @@ export default function GuidancePage() {
         )}
 
         {messages.map((msg, i) => (
-          <ChatMessage key={i} message={msg} />
+          <ChatMessage key={i} message={msg} patents={patents} papers={papers} />
         ))}
 
         {responding && messages[messages.length - 1]?.role === 'user' && (
