@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from services import session_store, rag, llm
 from services.text_utils import strip_think
+from services.patent_search import patent_to_rag_doc
 from models.schemas import Patent, Paper
 from api.deps import get_groq_key
 
@@ -30,18 +31,7 @@ async def analyze(session_id: str, groq_key: str = Depends(get_groq_key)):
         if (p["id"] if isinstance(p, dict) else p.id) in session.selected_paper_ids
     ]
 
-    documents = []
-    for patent in selected_patents:
-        text = f"PATENT: {patent.title}\n\nAbstract: {patent.abstract}"
-        if patent.assignee:
-            text += f"\n\nAssignee: {patent.assignee}"
-        documents.append(
-            {
-                "id": patent.id,
-                "text": text,
-                "metadata": {"type": "patent", "title": patent.title, "source": patent.source},
-            }
-        )
+    documents = [patent_to_rag_doc(patent) for patent in selected_patents]
 
     for paper in selected_papers:
         text = f"RESEARCH PAPER: {paper.title}\n\nAbstract: {paper.abstract}"

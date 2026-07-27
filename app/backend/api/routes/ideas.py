@@ -1,8 +1,10 @@
 import json
+import re
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from services import session_store, llm, rag
 from services.paper_search import search_pubmed
+from services.conference_search import search_conference_papers, CONFERENCE_YEARS_BACK
 from services.text_utils import strip_think
 from models.schemas import SelectIdeaRequest, EvaluateIdeaRequest
 from api.deps import get_groq_key
@@ -33,6 +35,124 @@ def _parse_json(text: str) -> any:
     raise json.JSONDecodeError("Could not extract JSON", text, 0)
 
 
+def _build_fto_messages(title: str, description: str, patent_context: str, technical_approach: str = "") -> list[dict]:
+    concept = f"Design concept: {title}\n\nDescription: {description}\n\n"
+    if technical_approach:
+        concept += f"Technical approach: {technical_approach}\n\n"
+
+    return [
+        {
+            "role": "system",
+            "content": (
+                "You are a patent research assistant generating structured FTO (Freedom to Operate) "
+                "landscape reports for medtech R&D engineers. Your output will be handed directly to "
+                "patent counsel. EVERY flagged element must cite a specific, verifiable patent number "
+                "and the exact relevant claim or passage. Never make an unsourced assertion. "
+                "Only cite patent numbers that literally appear in the patent corpus provided below — "
+                "never invent, guess, or recall a patent number from general knowledge. If the corpus "
+                "doesn't contain a patent relevant to an element, say so plainly instead of citing one. "
+                "Use exactly three confidence levels: 'Likely blocked', 'Worth reviewing', 'Appears clear'."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                concept
+                + f"Patent corpus:\n{patent_context}\n\n"
+                "Generate a structured FTO landscape report:\n\n"
+                "## Patent Landscape Summary\n"
+                "2-3 bullet points on patent density and key assignees in this space.\n\n"
+                "## Relevant Patents Found\n"
+                "For each relevant patent:\n"
+                "**[Patent Number]** — Title (Assignee, Year)\n"
+                "Relevant claim/passage: [specific claim text or close paraphrase with claim number]\n"
+                "Relevance: [1 sentence]\n\n"
+                "## FTO Element-by-Element Analysis\n"
+                "For each distinct technical element of the proposed concept:\n"
+                "**Element**: [specific technical element]\n"
+                "**Assessment**: Likely blocked | Worth reviewing | Appears clear\n"
+                "**Basis**: [Patent number + claim number or passage — required for every non-clear flag]\n\n"
+                "Before flagging anything as 'Worth reviewing', do the full comparison yourself: read the "
+                "specific claim language in the patent corpus, compare it element-by-element against the "
+                "proposed concept, and state your own conclusion about whether it conflicts. Never respond "
+                "with an instruction for the user to 'research this further' or 'check if this is patented' — "
+                "you have the patent corpus already; do that work now and report the result. Reserve 'Worth "
+                "reviewing' for cases where you've done this comparison and genuine ambiguity remains "
+                "(e.g. claim scope is contested or depends on facts not in the corpus), not as a stand-in "
+                "for analysis you haven't done.\n\n"
+                "Definitions: 'Likely blocked' = direct overlap with existing claims; "
+                "'Worth reviewing' = possible overlap, attorney review needed; "
+                "'Appears clear' = no direct overlap in searched corpus.\n\n"
+                "## Design-Around Strategies\n"
+                "For 'Likely blocked' or 'Worth reviewing' elements, specific modifications to avoid infringement.\n\n"
+                "## Patentability Assessment\n"
+                "Which elements appear novel and potentially patentable, with reasoning.\n\n"
+                "## Search Scope & Limitations\n"
+                "State: 'This FTO analysis covers US patents and EPO/PCT filings in the searched corpus. "
+                "It is a research triage tool, not a legal opinion. All findings should be reviewed "
+                "by qualified patent counsel before any filing or commercialization decision.'"
+            ),
+        },
+    ]
+
+
+_FTO_ASSESSMENT_RE = re.compile(r"\*\*Assessment\*\*:\s*(Likely blocked|Worth reviewing|Appears clear)", re.IGNORECASE)
+
+
+def _assess_fto_clearance(report: str) -> dict:
+    """Tally the per-element **Assessment** lines in an FTO report into a verdict.
+    'Mostly clear' means no element was flagged as an outright block and clear
+    elements outnumber (or match) the ones merely worth reviewing."""
+    labels = [m.lower() for m in _FTO_ASSESSMENT_RE.findall(report)]
+    blocked = labels.count("likely blocked")
+    review = labels.count("worth reviewing")
+    clear = labels.count("appears clear")
+    total = len(labels)
+    mostly_clear = total > 0 and blocked == 0 and clear >= review
+    if total == 0:
+        label = "Unassessed"
+    elif blocked > 0:
+        label = "Likely blocked"
+    elif mostly_clear:
+        label = "Appears clear"
+    else:
+        label = "Worth reviewing"
+    return {"blocked": blocked, "review": review, "clear": clear, "total": total, "mostly_clear": mostly_clear, "label": label}
+
+
+def _compact_patent_summaries(session_id: str, limit: int = 12, char_limit: int = 220) -> str:
+    docs = [d for d in rag.get_all_documents(session_id) if d["metadata"].get("type") == "patent"]
+    if not docs:
+        return "No patents loaded for this session yet."
+    lines = []
+    for d in docs[:limit]:
+        text = d["text"].replace("\n", " ")
+        lines.append(f"- {text[:char_limit]}{'…' if len(text) > char_limit else ''}")
+    return "\n".join(lines)
+
+
+async def _run_fto_check(idea: dict, session_id: str, groq_key: str) -> tuple[str, dict]:
+    """Semantically pull the patents most relevant to this specific idea (rather than
+    dumping the whole corpus) and run it through the same FTO report used for
+    user-selected ideas, so the filter applied here matches what the user sees later."""
+    query = f"{idea.get('title', '')} {idea.get('key_innovation', '')} {idea.get('technical_approach', '')}"
+    relevant = rag.query_collection(session_id, query, n_results=12)
+    patent_context = "\n\n---\n\n".join(
+        d["text"] for d in relevant if d["metadata"].get("type") == "patent"
+    )
+    if not patent_context:
+        patent_context = "No patents relevant to this concept's specific technical elements were found in the corpus."
+
+    messages = _build_fto_messages(
+        title=idea.get("title", ""),
+        description=idea.get("description", ""),
+        patent_context=patent_context,
+        technical_approach=idea.get("technical_approach", ""),
+    )
+    report = await llm.chat_complete(llm.REASONING_MODEL, messages, temperature=0.2, groq_api_key=groq_key)
+    return report, _assess_fto_clearance(report)
+
+
 @router.post("/session/{session_id}/generate-ideas")
 async def generate_ideas(session_id: str, groq_key: str = Depends(get_groq_key)):
     try:
@@ -59,10 +179,17 @@ async def generate_ideas(session_id: str, groq_key: str = Depends(get_groq_key))
     )
 
 
+FTO_TARGET_IDEAS = 3
+
+
 async def _generate_ideas_stream(session, groq_key: str = ""):
     yield {"status": "Generating candidate ideas…"}
 
-    # Stage 1: Generate 7 candidate ideas from patent gap analysis
+    patent_summaries = _compact_patent_summaries(session.id)
+
+    # Stage 1: Generate 7 candidate ideas, grounded in both the gap analysis and the
+    # actual patents pulled for this session — not just the analysis summary — so
+    # candidates are steered away from what's already patented from the start.
     candidate_messages = [
         {
             "role": "system",
@@ -77,11 +204,13 @@ async def _generate_ideas_stream(session, groq_key: str = ""):
             "content": (
                 f'Patent landscape analysis for "{session.query}":\n\n'
                 f"{session.analysis[:2500]}\n\n"
+                f"Patents already pulled for this session (do not propose ideas that replicate these):\n"
+                f"{patent_summaries}\n\n"
                 "Generate exactly 7 novel product/technology ideas that:\n"
                 "1. Specifically fill the identified patent gaps\n"
                 "2. Are technically feasible\n"
                 "3. Have clear commercial or societal potential\n"
-                "4. Do NOT replicate any patented approach described above\n\n"
+                "4. Do NOT replicate any patented approach listed above\n\n"
                 "Return a JSON array:\n"
                 "[\n"
                 "  {\n"
@@ -134,7 +263,42 @@ async def _generate_ideas_stream(session, groq_key: str = ""):
     if not pubmed_context:
         pubmed_context = "No directly matching PubMed results found for these keywords."
 
-    # Stage 3: LLM validates technical feasibility and narrows to 3-5 ideas
+    yield {"status": "Scanning recent conference proceedings…"}
+
+    # Recent conference papers surface new materials/designs faster than journal
+    # publication cycles — use them both to sharpen idea validation below and,
+    # via the RAG embed, to inform later product-development consulting in chat.
+    conference_papers = await search_conference_papers(unique_keywords, query=session.query)
+
+    conference_context = "\n\n".join(
+        f"Venue: {p.venue or 'Unknown venue'} ({p.published or 'n.d.'})\nTitle: {p.title}\nAbstract: {p.abstract[:400]}"
+        for p in conference_papers
+        if p.abstract
+    )
+    if not conference_context:
+        conference_context = "No recent conference papers found for these keywords."
+
+    if conference_papers:
+        conference_docs = [
+            {
+                "id": paper.id,
+                "text": (
+                    f"CONFERENCE PAPER ({paper.venue or 'Unknown venue'}, {paper.published or 'n.d.'}): "
+                    f"{paper.title}\n\nAbstract: {paper.abstract}"
+                ),
+                "metadata": {
+                    "type": "conference",
+                    "title": paper.title,
+                    "source": paper.source,
+                    "venue": paper.venue or "",
+                },
+            }
+            for paper in conference_papers
+        ]
+        rag.embed_documents(session.id, conference_docs)
+
+    # Stage 3: LLM ranks ALL candidates by patentability + technical feasibility.
+    # Nothing is discarded here — the FTO filter in stage 4 makes the real cut.
     validation_messages = [
         {
             "role": "system",
@@ -150,31 +314,64 @@ async def _generate_ideas_stream(session, groq_key: str = ""):
                 f"Research area: \"{session.query}\"\n\n"
                 f"Candidate ideas:\n{json.dumps(candidates, indent=2)[:2500]}\n\n"
                 f"Relevant research literature:\n{pubmed_context[:1500]}\n\n"
-                "Select the 3 to 5 ideas that are BOTH:\n"
-                "1. Most likely to be patentable (based on the gap analysis)\n"
-                "2. Most technically feasible (supported or at least not contradicted by current research)\n\n"
-                "For each selected idea, return the original fields plus:\n"
+                f"Recent conference papers (last {CONFERENCE_YEARS_BACK} years) on related materials/designs:\n{conference_context[:1500]}\n\n"
+                f"Rank ALL {len(candidates)} ideas from strongest to weakest, based on BOTH:\n"
+                "1. Likely patentability (based on the gap analysis)\n"
+                "2. Technical feasibility (supported or at least not contradicted by current research)\n\n"
+                "Where a recent conference paper describes a new material, design, or method that would make "
+                "a candidate idea stronger, more novel, or technically sharper, incorporate that insight into "
+                "the idea's description and technical_approach — don't just use conference papers as a feasibility "
+                "check, use them as inspiration to improve the idea itself.\n\n"
+                "For every idea, return the original fields plus:\n"
                 '- "scientific_feasibility": A 2-3 sentence assessment of technical feasibility '
                 "(cite specific research findings if relevant, or explain why the approach is feasible "
                 "based on established science)\n"
-                '- "supporting_research": Brief note on what existing research supports or informs this idea '
-                "(name specific papers/fields from the research context, or note if it's a genuine frontier)\n\n"
+                '- "supporting_research": Brief note on what existing research and recent conference findings '
+                "support or inform this idea (name specific papers/venues from the context above, or note if "
+                "it's a genuine frontier)\n\n"
                 "Do NOT include the research_keywords field in the output.\n"
-                "Return a JSON array of 3-5 ideas."
+                f"Return a JSON array of all {len(candidates)} ideas, ordered strongest first."
             ),
         },
     ]
 
-    yield {"status": "Validating and ranking ideas…"}
+    yield {"status": "Ranking ideas by patentability and feasibility…"}
 
-    raw2 = await llm.chat_complete(llm.REASONING_MODEL, validation_messages, temperature=0.6, groq_api_key=groq_key, max_tokens=2000)
+    raw2 = await llm.chat_complete(llm.REASONING_MODEL, validation_messages, temperature=0.6, groq_api_key=groq_key, max_tokens=3500)
     try:
-        ideas = _parse_json(raw2)
+        ranked_ideas = _parse_json(raw2)
     except (json.JSONDecodeError, ValueError):
-        raise ValueError("Model returned malformed JSON for validated ideas")
+        raise ValueError("Model returned malformed JSON for ranked ideas")
 
-    session_store.update_session(session.id, {"ideas": ideas})
-    yield {"done": True, "ideas": ideas}
+    # Stage 4: run each ranked idea through the FTO filter against the patent corpus,
+    # strongest first, stopping once enough of them come back mostly clear.
+    accepted: list[dict] = []
+    for i, idea in enumerate(ranked_ideas):
+        title = idea.get("title", f"Idea {i + 1}")
+        yield {"status": f"Checking freedom-to-operate for “{title}” ({i + 1}/{len(ranked_ideas)})…"}
+        report, clearance = await _run_fto_check(idea, session.id, groq_key)
+        idea["fto_report"] = report
+        idea["fto_clearance"] = clearance
+        if clearance["mostly_clear"]:
+            accepted.append(idea)
+            yield {"status": f"“{title}” appears clear of the patent corpus."}
+            if len(accepted) >= FTO_TARGET_IDEAS:
+                break
+        else:
+            yield {"status": f"“{title}” — {clearance['label'].lower()} — trying the next idea…"}
+
+    if len(accepted) < FTO_TARGET_IDEAS:
+        # Checked every candidate and still came up short of the target — fill out
+        # with the least-encumbered leftovers rather than returning fewer ideas.
+        accepted_ids = {id(idea) for idea in accepted}
+        leftovers = sorted(
+            (idea for idea in ranked_ideas if id(idea) not in accepted_ids),
+            key=lambda idea: (idea["fto_clearance"]["blocked"], idea["fto_clearance"]["review"]),
+        )
+        accepted.extend(leftovers[: FTO_TARGET_IDEAS - len(accepted)])
+
+    session_store.update_session(session.id, {"ideas": accepted})
+    yield {"done": True, "ideas": accepted}
 
 
 @router.post("/session/{session_id}/select-idea")
@@ -188,63 +385,31 @@ async def select_idea(session_id: str, req: SelectIdeaRequest, groq_key: str = D
         raise HTTPException(status_code=400, detail="Invalid idea index")
 
     selected = session.ideas[req.idea_index]
-    all_docs = rag.get_all_documents(session_id)
-    patent_context = "\n\n---\n\n".join(
-        d["text"] for d in all_docs if d["metadata"].get("type") == "patent"
-    )
-
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are a patent research assistant generating structured FTO (Freedom to Operate) "
-                "landscape reports for medtech R&D engineers. Your output will be handed directly to "
-                "patent counsel. EVERY flagged element must cite a specific, verifiable patent number "
-                "and the exact relevant claim or passage. Never make an unsourced assertion. "
-                "Use exactly three confidence levels: 'Likely blocked', 'Worth reviewing', 'Appears clear'."
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Design concept: {selected.get('title')}\n\n"
-                f"Description: {selected.get('description')}\n\n"
-                f"Technical approach: {selected.get('technical_approach')}\n\n"
-                f"Patent corpus:\n{patent_context}\n\n"
-                "Generate a structured FTO landscape report:\n\n"
-                "## Patent Landscape Summary\n"
-                "2-3 sentences on patent density and key assignees in this space.\n\n"
-                "## Relevant Patents Found\n"
-                "For each relevant patent:\n"
-                "**[Patent Number]** — Title (Assignee, Year)\n"
-                "Relevant claim/passage: [specific claim text or close paraphrase with claim number]\n"
-                "Relevance: [1 sentence]\n\n"
-                "## FTO Element-by-Element Analysis\n"
-                "For each distinct technical element of the proposed concept:\n"
-                "**Element**: [specific technical element]\n"
-                "**Assessment**: Likely blocked | Worth reviewing | Appears clear\n"
-                "**Basis**: [Patent number + claim number or passage — required for every non-clear flag]\n\n"
-                "Definitions: 'Likely blocked' = direct overlap with existing claims; "
-                "'Worth reviewing' = possible overlap, attorney review needed; "
-                "'Appears clear' = no direct overlap in searched corpus.\n\n"
-                "## Design-Around Strategies\n"
-                "For 'Likely blocked' or 'Worth reviewing' elements, specific modifications to avoid infringement.\n\n"
-                "## Patentability Assessment\n"
-                "Which elements appear novel and potentially patentable, with reasoning.\n\n"
-                "## Search Scope & Limitations\n"
-                "State: 'This FTO analysis covers US patents and EPO/PCT filings in the searched corpus. "
-                "It is a research triage tool, not a legal opinion. All findings should be reviewed "
-                "by qualified patent counsel before any filing or commercialization decision.'"
-            ),
-        },
-    ]
+    cached_report = selected.get("fto_report")
 
     async def stream_check():
-        full_response = ""
         try:
-            async for chunk in llm.chat_stream(llm.REASONING_MODEL, messages, temperature=0.2, groq_api_key=groq_key):
-                full_response += chunk
-                yield f"data: {json.dumps({'content': chunk})}\n\n"
+            if cached_report:
+                # Idea generation already ran this exact concept through the FTO filter
+                # (see stage 4 of _generate_ideas_stream) — reuse it instead of paying
+                # for the same check twice.
+                full_response = cached_report
+                yield f"data: {json.dumps({'content': full_response})}\n\n"
+            else:
+                all_docs = rag.get_all_documents(session_id)
+                patent_context = "\n\n---\n\n".join(
+                    d["text"] for d in all_docs if d["metadata"].get("type") == "patent"
+                )
+                messages = _build_fto_messages(
+                    title=selected.get("title"),
+                    description=selected.get("description"),
+                    patent_context=patent_context,
+                    technical_approach=selected.get("technical_approach"),
+                )
+                full_response = ""
+                async for chunk in llm.chat_stream(llm.REASONING_MODEL, messages, temperature=0.2, groq_api_key=groq_key):
+                    full_response += chunk
+                    yield f"data: {json.dumps({'content': chunk})}\n\n"
             session_store.update_session(
                 session_id,
                 {
@@ -284,50 +449,11 @@ async def evaluate_idea(session_id: str, req: EvaluateIdeaRequest, groq_key: str
             detail="No patent documents found. Run the analysis step first to load the patent corpus.",
         )
 
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are a patent research assistant generating structured FTO (Freedom to Operate) "
-                "landscape reports for medtech R&D engineers. Your output will be handed directly to "
-                "patent counsel. EVERY flagged element must cite a specific, verifiable patent number "
-                "and the exact relevant claim or passage. Never make an unsourced assertion. "
-                "Use exactly three confidence levels: 'Likely blocked', 'Worth reviewing', 'Appears clear'."
-            ),
-        },
-        {
-            "role": "user",
-            "content": (
-                f"Design concept: {req.idea_title}\n\n"
-                f"Description: {req.idea_description}\n\n"
-                f"Patent corpus:\n{patent_context}\n\n"
-                "Generate a structured FTO landscape report:\n\n"
-                "## Patent Landscape Summary\n"
-                "2-3 sentences on patent density and key assignees in this space.\n\n"
-                "## Relevant Patents Found\n"
-                "For each relevant patent:\n"
-                "**[Patent Number]** — Title (Assignee, Year)\n"
-                "Relevant claim/passage: [specific claim text or close paraphrase with claim number]\n"
-                "Relevance: [1 sentence]\n\n"
-                "## FTO Element-by-Element Analysis\n"
-                "For each distinct technical element of the proposed concept:\n"
-                "**Element**: [specific technical element]\n"
-                "**Assessment**: Likely blocked | Worth reviewing | Appears clear\n"
-                "**Basis**: [Patent number + claim number or passage — required for every non-clear flag]\n\n"
-                "Definitions: 'Likely blocked' = direct overlap with existing claims; "
-                "'Worth reviewing' = possible overlap, attorney review needed; "
-                "'Appears clear' = no direct overlap in searched corpus.\n\n"
-                "## Design-Around Strategies\n"
-                "For 'Likely blocked' or 'Worth reviewing' elements, specific modifications to avoid infringement.\n\n"
-                "## Patentability Assessment\n"
-                "Which elements appear novel and potentially patentable, with reasoning.\n\n"
-                "## Search Scope & Limitations\n"
-                "State: 'This FTO analysis covers US patents and EPO/PCT filings in the searched corpus. "
-                "It is a research triage tool, not a legal opinion. All findings should be reviewed "
-                "by qualified patent counsel before any filing or commercialization decision.'"
-            ),
-        },
-    ]
+    messages = _build_fto_messages(
+        title=req.idea_title,
+        description=req.idea_description,
+        patent_context=patent_context,
+    )
 
     async def stream_evaluation():
         full_response = ""

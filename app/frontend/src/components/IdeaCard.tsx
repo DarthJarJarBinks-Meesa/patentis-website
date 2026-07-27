@@ -1,4 +1,4 @@
-import type { Idea } from '../types'
+import type { Idea, FtoClearance } from '../types'
 
 interface Props {
   idea: Idea
@@ -26,7 +26,10 @@ export default function IdeaCard({ idea, index, selected, onSelect }: Props) {
           {index + 1}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-base font-bold text-gray-100 mb-1">{idea.title}</h3>
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <h3 className="text-base font-bold text-gray-100">{idea.title}</h3>
+            {idea.fto_clearance && <ClearanceBadge clearance={idea.fto_clearance} />}
+          </div>
           <p className="text-sm text-indigo-300 mb-3 italic">{idea.tagline}</p>
 
           <div className="space-y-3 text-sm">
@@ -54,6 +57,23 @@ export default function IdeaCard({ idea, index, selected, onSelect }: Props) {
         </div>
       </div>
     </div>
+  )
+}
+
+function ClearanceBadge({ clearance }: { clearance: FtoClearance }) {
+  const colors = clearance.mostly_clear
+    ? 'bg-emerald-950/60 border-emerald-700 text-emerald-300'
+    : clearance.blocked > 0
+      ? 'bg-red-950/60 border-red-700 text-red-300'
+      : 'bg-amber-950/60 border-amber-700 text-amber-300'
+
+  return (
+    <span
+      className={`flex-shrink-0 text-xs font-medium px-2 py-1 rounded-full border whitespace-nowrap ${colors}`}
+      title={`FTO: ${clearance.clear} clear, ${clearance.review} worth reviewing, ${clearance.blocked} likely blocked`}
+    >
+      FTO: {clearance.label}
+    </span>
   )
 }
 

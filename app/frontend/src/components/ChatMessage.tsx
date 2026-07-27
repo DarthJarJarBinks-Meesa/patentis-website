@@ -1,9 +1,17 @@
-import ReactMarkdown from 'react-markdown'
+import PatentMarkdown from './PatentMarkdown'
 import ThinkingBlock from './ThinkingBlock'
-import type { ChatMessage as Msg } from '../types'
+import type { ChatMessage as Msg, Patent, Paper } from '../types'
 import { parseThinking } from '../utils/thinking'
 
-export default function ChatMessage({ message }: { message: Msg }) {
+export default function ChatMessage({
+  message,
+  patents,
+  papers,
+}: {
+  message: Msg
+  patents?: Patent[]
+  papers?: Paper[]
+}) {
   const isUser = message.role === 'user'
 
   if (isUser) {
@@ -23,7 +31,12 @@ export default function ChatMessage({ message }: { message: Msg }) {
       <div className="max-w-[85%]">
         <ThinkingBlock text={thinking} />
         <div className="rounded-2xl rounded-tl-sm bg-gray-800 px-4 py-3">
-          <ReactMarkdown className="prose-patent text-sm">{response || message.content}</ReactMarkdown>
+          <PatentMarkdown
+            className="prose-patent text-sm"
+            text={response || message.content}
+            patents={patents}
+            papers={papers}
+          />
         </div>
       </div>
     </div>
