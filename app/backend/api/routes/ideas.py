@@ -149,7 +149,7 @@ async def _run_fto_check(idea: dict, session_id: str, groq_key: str) -> tuple[st
         patent_context=patent_context,
         technical_approach=idea.get("technical_approach", ""),
     )
-    report = await llm.chat_complete(llm.REASONING_MODEL, messages, temperature=0.2, groq_api_key=groq_key)
+    report = await llm.chat_complete(llm.REASONING_MODEL, messages, temperature=0.2, groq_api_key=groq_key, max_tokens=800)
     return report, _assess_fto_clearance(report)
 
 
@@ -179,7 +179,7 @@ async def generate_ideas(session_id: str, groq_key: str = Depends(get_groq_key))
     )
 
 
-FTO_TARGET_IDEAS = 3
+FTO_TARGET_IDEAS = 2
 
 
 async def _generate_ideas_stream(session, groq_key: str = ""):
@@ -206,7 +206,7 @@ async def _generate_ideas_stream(session, groq_key: str = ""):
                 f"{session.analysis[:2500]}\n\n"
                 f"Patents already pulled for this session (do not propose ideas that replicate these):\n"
                 f"{patent_summaries}\n\n"
-                "Generate exactly 7 novel product/technology ideas that:\n"
+                "Generate exactly 4 novel product/technology ideas that:\n"
                 "1. Specifically fill the identified patent gaps\n"
                 "2. Are technically feasible\n"
                 "3. Have clear commercial or societal potential\n"
@@ -230,7 +230,7 @@ async def _generate_ideas_stream(session, groq_key: str = ""):
         },
     ]
 
-    raw = await llm.chat_complete(llm.REASONING_MODEL, candidate_messages, temperature=0.85, groq_api_key=groq_key, max_tokens=3000)
+    raw = await llm.chat_complete(llm.REASONING_MODEL, candidate_messages, temperature=0.85, groq_api_key=groq_key, max_tokens=1500)
     try:
         candidates = _parse_json(raw)
     except (json.JSONDecodeError, ValueError):
@@ -315,7 +315,7 @@ async def _generate_ideas_stream(session, groq_key: str = ""):
                 f"Candidate ideas:\n{json.dumps(candidates, indent=2)[:2500]}\n\n"
                 f"Relevant research literature:\n{pubmed_context[:1500]}\n\n"
                 f"Recent conference papers (last {CONFERENCE_YEARS_BACK} years) on related materials/designs:\n{conference_context[:1500]}\n\n"
-                f"Rank ALL {len(candidates)} ideas from strongest to weakest, based on BOTH:\n"
+                f"Rank all {len(candidates)} ideas from strongest to weakest, based on BOTH:\n"
                 "1. Likely patentability (based on the gap analysis)\n"
                 "2. Technical feasibility (supported or at least not contradicted by current research)\n\n"
                 "Where a recent conference paper describes a new material, design, or method that would make "
@@ -337,7 +337,7 @@ async def _generate_ideas_stream(session, groq_key: str = ""):
 
     yield {"status": "Ranking ideas by patentability and feasibility…"}
 
-    raw2 = await llm.chat_complete(llm.REASONING_MODEL, validation_messages, temperature=0.6, groq_api_key=groq_key, max_tokens=3500)
+    raw2 = await llm.chat_complete(llm.REASONING_MODEL, validation_messages, temperature=0.6, groq_api_key=groq_key, max_tokens=1500)
     try:
         ranked_ideas = _parse_json(raw2)
     except (json.JSONDecodeError, ValueError):

@@ -154,7 +154,7 @@ async def start_conversation(req: ConversationStartRequest, groq_key: str = Depe
             full_analysis = ""
             async for chunk in llm.chat_stream(
                 llm.REASONING_MODEL, analysis_messages, temperature=0.3,
-                groq_api_key=groq_key, max_tokens=2048,
+                groq_api_key=groq_key, max_tokens=1000,
             ):
                 full_analysis += chunk
                 yield _sse({"type": "analysis_chunk", "content": chunk})
