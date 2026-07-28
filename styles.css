@@ -304,7 +304,7 @@ button,
 }
 
 .founders-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .founder-card {
@@ -501,6 +501,12 @@ button,
     grid-template-columns: 1fr;
   }
 
+  .founders-grid .founder-card:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    width: calc((100% - 1rem) / 2);
+    justify-self: center;
+  }
+
   .stat-item + .stat-item {
     border-left: 0;
     border-top: 1px solid var(--line);
@@ -539,6 +545,11 @@ button,
   .buyers-grid,
   .founders-grid {
     grid-template-columns: 1fr;
+  }
+
+  .founders-grid .founder-card:last-child:nth-child(odd) {
+    grid-column: auto;
+    width: auto;
   }
 
   .cta-form {
