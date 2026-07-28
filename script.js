@@ -102,6 +102,7 @@
     let width = 0;
     let height = 0;
     let dpr = 1;
+    let resizeTimer;
 
     function nodeCountForViewport() {
       const area = width * height;
@@ -114,9 +115,11 @@
     }
 
     const setCanvasSize = () => {
+      const layer = canvas.parentElement;
+      const bounds = layer ? layer.getBoundingClientRect() : null;
       dpr = Math.min(window.devicePixelRatio || 1, 2);
-      width = window.innerWidth;
-      height = Math.max(window.innerHeight, 480);
+      width = Math.round((bounds && bounds.width) || window.innerWidth);
+      height = Math.max(Math.round((bounds && bounds.height) || window.innerHeight), 480);
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
       canvas.style.width = `${width}px`;
@@ -240,30 +243,25 @@
       mouse.y = -9999;
     });
 
-    window.addEventListener(
-      "touchstart",
-      (e) => {
-        if (e.touches.length) onPointer(e.touches[0].clientX, e.touches[0].clientY);
-      },
-      { passive: true }
-    );
-
-    window.addEventListener(
-      "touchmove",
-      (e) => {
-        if (e.touches.length) onPointer(e.touches[0].clientX, e.touches[0].clientY);
-      },
-      { passive: true }
-    );
-
-    window.addEventListener("touchend", () => {
-      mouse.x = -9999;
-      mouse.y = -9999;
-    });
-
     window.addEventListener("resize", () => {
-      setCanvasSize();
-      initNodes();
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => {
+        const layer = canvas.parentElement;
+        const bounds = layer ? layer.getBoundingClientRect() : null;
+        const nextWidth = Math.round((bounds && bounds.width) || window.innerWidth);
+        const nextHeight = Math.max(
+          Math.round((bounds && bounds.height) || window.innerHeight),
+          480
+        );
+        const nextDpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        // Safari emits resize while its address bar moves. The large viewport
+        // remains stable, so avoid rebuilding every node during a scroll.
+        if (nextWidth === width && nextHeight === height && nextDpr === dpr) return;
+
+        setCanvasSize();
+        initNodes();
+      }, 150);
     });
 
     const boot = () => {
