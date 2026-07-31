@@ -18,7 +18,8 @@ export function linkifyPatents(text: string): string {
 export function linkifyDOIs(text: string): string {
   if (!text) return text
   return text.replace(DOI_RE, (doi) => {
-    return `[${doi}](https://doi.org/${doi})`
+    const ssUrl = `https://www.semanticscholar.org/search?q=${encodeURIComponent(doi)}`
+    return `[${doi}](https://doi.org/${doi}) ([Semantic Scholar](${ssUrl}))`
   })
 }
 
