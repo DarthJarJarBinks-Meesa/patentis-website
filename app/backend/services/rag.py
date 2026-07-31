@@ -54,11 +54,12 @@ def query_collection(session_id: str, query: str, n_results: int = 10) -> list[d
     results = col.query(
         query_embeddings=[embedding],
         n_results=n,
-        include=["documents", "metadatas", "distances"],
+        include=["documents", "metadatas", "distances", "ids"],
     )
     return [
-        {"text": doc, "metadata": meta, "distance": dist}
-        for doc, meta, dist in zip(
+        {"id": doc_id, "text": doc, "metadata": meta, "distance": dist}
+        for doc_id, doc, meta, dist in zip(
+            results["ids"][0],
             results["documents"][0],
             results["metadatas"][0],
             results["distances"][0],
@@ -68,10 +69,10 @@ def query_collection(session_id: str, query: str, n_results: int = 10) -> list[d
 
 def get_all_documents(session_id: str) -> list[dict]:
     col = _collection(session_id)
-    result = col.get(include=["documents", "metadatas"])
+    result = col.get(include=["documents", "metadatas", "ids"])
     return [
-        {"text": doc, "metadata": meta}
-        for doc, meta in zip(result["documents"], result["metadatas"])
+        {"id": doc_id, "text": doc, "metadata": meta}
+        for doc_id, doc, meta in zip(result["ids"], result["documents"], result["metadatas"])
     ]
 
 

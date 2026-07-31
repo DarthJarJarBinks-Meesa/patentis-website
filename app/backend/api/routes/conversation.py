@@ -86,7 +86,8 @@ async def start_conversation(req: ConversationStartRequest, groq_key: str = Depe
             yield _sse({"type": "status", "message": "Building patent knowledge base…"})
             documents = []
             for patent in patents:
-                text = f"PATENT: {patent.title}\n\nAbstract: {patent.abstract}"
+                pat_num = patent.id.replace("gp_", "").replace("epo_", "").upper()
+                text = f"PATENT {pat_num}: {patent.title}\n\nAbstract: {patent.abstract}"
                 if patent.assignee:
                     text += f"\n\nAssignee: {patent.assignee}"
                 documents.append({
