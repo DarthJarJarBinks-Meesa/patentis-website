@@ -32,6 +32,28 @@ def _parse_json(text: str) -> any:
                 return json.loads(text[start : end + 1])
             except json.JSONDecodeError:
                 continue
+    # Truncated array recovery: find all complete {...} objects inside a partial [...]
+    array_start = text.find("[")
+    if array_start != -1:
+        objects = []
+        depth = 0
+        obj_start = None
+        for i, ch in enumerate(text[array_start:], array_start):
+            if ch == "{":
+                if depth == 0:
+                    obj_start = i
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0 and obj_start is not None:
+                    try:
+                        obj = json.loads(text[obj_start : i + 1])
+                        objects.append(obj)
+                    except json.JSONDecodeError:
+                        pass
+                    obj_start = None
+        if objects:
+            return objects
     raise json.JSONDecodeError("Could not extract JSON", text, 0)
 
 
@@ -216,10 +238,10 @@ async def _generate_ideas_stream(session, groq_key: str = ""):
                 "  {\n"
                 '    "title": "Short descriptive name",\n'
                 '    "tagline": "One sentence value proposition",\n'
-                '    "description": "2-3 paragraph technical description",\n'
+                '    "description": "1-2 sentence technical overview",\n'
                 '    "key_innovation": "The specific novel element that makes this patentable",\n'
                 '    "target_market": "Who needs this and why",\n'
-                '    "technical_approach": "Step-by-step explanation of how it works",\n'
+                '    "technical_approach": "2-3 sentence explanation of how it works",\n'
                 '    "why_unpatented": "Specific reason this approach is not covered by existing patents",\n'
                 '    "research_keywords": ["keyword1", "keyword2", "keyword3"]\n'
                 "  }\n"
@@ -230,7 +252,7 @@ async def _generate_ideas_stream(session, groq_key: str = ""):
         },
     ]
 
-    raw = await llm.chat_complete(llm.REASONING_MODEL, candidate_messages, temperature=0.85, groq_api_key=groq_key, max_tokens=1500)
+    raw = await llm.chat_complete(llm.REASONING_MODEL, candidate_messages, temperature=0.85, groq_api_key=groq_key, max_tokens=2500)
     try:
         candidates = _parse_json(raw)
     except (json.JSONDecodeError, ValueError):
