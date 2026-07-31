@@ -1,9 +1,9 @@
 from fastapi import Header, HTTPException
-from services.llm import GROQ_API_KEY
+from services.llm import OPENAI_API_KEY
 
 
 def get_groq_key(x_groq_api_key: str = Header(default="")) -> str:
-    key = x_groq_api_key or GROQ_API_KEY
+    key = x_groq_api_key or OPENAI_API_KEY
     if not key:
-        raise HTTPException(status_code=400, detail="Groq API key required. Enter it on the app's home screen.")
+        raise HTTPException(status_code=400, detail="OpenAI API key required. Add OPENAI_API_KEY to backend/.env")
     return key

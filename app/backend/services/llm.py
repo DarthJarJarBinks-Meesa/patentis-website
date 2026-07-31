@@ -4,17 +4,20 @@ import json
 import os
 from typing import AsyncGenerator
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GROQ_BASE = "https://api.groq.com/openai/v1"
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_BASE = "https://api.openai.com/v1"
 
-INSTRUCTION_MODEL = os.getenv("INSTRUCTION_MODEL", "llama-3.3-70b-versatile")
-REASONING_MODEL = os.getenv("REASONING_MODEL", "llama-3.3-70b-versatile")
+# Keep GROQ_API_KEY as an alias so existing callers that pass groq_api_key= still work
+GROQ_API_KEY = OPENAI_API_KEY
+
+INSTRUCTION_MODEL = os.getenv("INSTRUCTION_MODEL", "gpt-4o-mini")
+REASONING_MODEL = os.getenv("REASONING_MODEL", "gpt-4o-mini")
 
 
-def _headers(groq_api_key: str = "") -> dict:
-    key = groq_api_key or GROQ_API_KEY
+def _headers(api_key: str = "") -> dict:
+    key = api_key or OPENAI_API_KEY
     if not key:
-        raise ValueError("GROQ_API_KEY is not set — provide it in the app or add it to backend/.env")
+        raise ValueError("OPENAI_API_KEY is not set — add it to backend/.env")
     return {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
 
 
@@ -43,10 +46,10 @@ async def chat_stream(
     print(f"[llm] chat_stream model={model} payload={payload_bytes}B max_tokens={max_tokens}")
     for attempt in range(4):
         try:
-            async with httpx.AsyncClient(timeout=300.0) as client:
+            async with httpx.AsyncClient(timeout=120.0) as client:
                 async with client.stream(
                     "POST",
-                    f"{GROQ_BASE}/chat/completions",
+                    f"{OPENAI_BASE}/chat/completions",
                     headers=_headers(groq_api_key),
                     json=payload,
                 ) as response:
@@ -111,7 +114,7 @@ async def extract_keywords(query: str, groq_api_key: str = "") -> dict:
 async def check_health() -> dict:
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            r = await client.get(f"{GROQ_BASE}/models", headers=_headers())
-            return {"provider": "groq", "connected": r.status_code == 200}
+            r = await client.get(f"{OPENAI_BASE}/models", headers=_headers())
+            return {"provider": "openai", "connected": r.status_code == 200}
     except Exception:
-        return {"provider": "groq", "connected": False}
+        return {"provider": "openai", "connected": False}
