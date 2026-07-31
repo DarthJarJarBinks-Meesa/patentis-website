@@ -1,6 +1,6 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { linkifyPatents, linkifyTitles } from '../utils/linkifyPatents'
+import { linkifyPatents, linkifyDOIs, linkifyTitles } from '../utils/linkifyPatents'
 import type { Patent, Paper } from '../types'
 
 const REMARK_PLUGINS = [remarkGfm]
@@ -34,6 +34,7 @@ export default function PatentMarkdown({
   if (patents?.length) content = linkifyTitles(content, patents)
   if (papers?.length) content = linkifyTitles(content, papers)
   content = linkifyPatents(content)
+  content = linkifyDOIs(content)
 
   return (
     <ReactMarkdown className={className} remarkPlugins={REMARK_PLUGINS} components={components}>
