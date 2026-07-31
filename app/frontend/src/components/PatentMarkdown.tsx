@@ -1,6 +1,9 @@
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { linkifyPatents, linkifyTitles } from '../utils/linkifyPatents'
 import type { Patent, Paper } from '../types'
+
+const REMARK_PLUGINS = [remarkGfm]
 
 const components = {
   a: ({ href, children, ...props }: React.ComponentPropsWithoutRef<'a'>) => (
@@ -8,7 +11,7 @@ const components = {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-indigo-400 hover:text-indigo-300 underline"
+      className="text-indigo-400 hover:text-indigo-300 underline break-all"
       {...props}
     >
       {children}
@@ -33,7 +36,7 @@ export default function PatentMarkdown({
   content = linkifyPatents(content)
 
   return (
-    <ReactMarkdown className={className} components={components}>
+    <ReactMarkdown className={className} remarkPlugins={REMARK_PLUGINS} components={components}>
       {content}
     </ReactMarkdown>
   )
